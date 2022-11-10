@@ -1,15 +1,54 @@
 # Supports
 
-Block Supports is the API that allows a block to declare features used in the editor.
+Block Supports is the API that allows a block to declare support for certain features.
 
-Some block supports — for example, `anchor` or `className` — apply their attributes by adding additional props on the element returned by `save`. This will work automatically for default HTML tag elements (`div`, etc). However, if the return value of your `save` is a custom component element, you will need to ensure that your custom component handles these props in order for the attributes to be persisted.
+Opting into any of these features will register additional attributes on the block and provide the UI to manipulate that attribute.
+
+In order for the attribute to get applied to the block the generated properties get added to the wrapping element of the block. They get added to the object you get returned from the `useBlockProps` hook.
+
+`BlockEdit` function:
+```js
+function BlockEdit() {
+	const blockProps = useBlockProps();
+
+	return (
+		<div {...blockProps}>Hello World!</div>
+	);
+}
+```
+
+`save` function:
+```js
+function BlockEdit() {
+	const blockProps = useBlockProps.save();
+
+	return (
+		<div {...blockProps}>Hello World!</div>
+	);
+}
+```
+
+For dynamic blocks that get rendered via a `render_callback` in PHP you can use the `get_block_wrapper_attributes()` function. It returns a string containing all the generated properties and needs to get output in the opening tag of the wrapping block element.
+
+`render_callback` function:
+```php
+function render_block() {
+	$wrapper_attributes = get_block_wrapper_attributes();
+
+	return sprintf(
+		'<div %1$s>%2$s</div>',
+		$wrapper_attributes,
+		'Hello World!'
+	);
+}
+```
 
 ## anchor
 
 -   Type: `boolean`
 -   Default value: `false`
 
-Anchors let you link directly to a specific block on a page. This property adds a field to define an id for the block and a button to copy the direct link.
+Anchors let you link directly to a specific block on a page. This property adds a field to define an id for the block and a button to copy the direct link. _Important: It doesn't work with dynamic blocks yet._
 
 ```js
 // Declare support for anchor links.
@@ -23,7 +62,7 @@ supports: {
 -   Type: `boolean` or `array`
 -   Default value: `false`
 
-This property adds block controls which allow to change block's alignment. _Important: It doesn't work with dynamic blocks yet._
+This property adds block controls which allow to change block's alignment.
 
 ```js
 supports: {
@@ -63,6 +102,20 @@ This property allows to enable [wide alignment](/docs/how-to-guides/themes/theme
 supports: {
 	// Remove the support for wide alignment.
 	alignWide: false
+}
+```
+
+## ariaLabel
+
+- Type: `boolean`
+- Default value: `false`
+
+ARIA-labels let you define an accessible label for elements. This property allows enabling the definition of an aria-label for the block, without exposing a UI field.
+
+```js
+supports: {
+	// Add the support for aria label.
+	ariaLabel: true
 }
 ```
 
@@ -480,6 +533,20 @@ supports: {
 }
 ```
 
+## lock
+
+-   Type: `boolean`
+-   Default value: `true`
+
+A block may want to disable the ability to toggle the lock state. It can be locked/unlocked by a user from the block "Options" dropdown by default. To disable this behavior, set `lock` to `false`.
+
+```js
+supports: {
+	// Remove support for locking UI.
+	lock: false
+}
+```
+
 ## spacing
 
 -   Type: `Object`
@@ -487,6 +554,7 @@ supports: {
 -   Subproperties:
     -   `margin`: type `boolean` or `array`, default value `false`
     -   `padding`: type `boolean` or `array`, default value `false`
+    -   `blockGap`: type `boolean` or `array`, default value `false`
 
 This value signals that a block supports some of the CSS style properties related to spacing. When it does, the block editor will show UI controls for the user to set their values, if [the theme declares support](/docs/how-to-guides/themes/theme-support.md#cover-block-padding).
 
@@ -495,25 +563,41 @@ supports: {
     spacing: {
         margin: true,  // Enable margin UI control.
         padding: true, // Enable padding UI control.
+        blockGap: true,  // Enables block spacing UI control.
     }
 }
 ```
 
 When the block declares support for a specific spacing property, the attributes definition is extended to include the `style` attribute.
 
--   `style`: attribute of `object` type with no default assigned. This is added when `margin` or `padding` support is declared. It stores the custom values set by the user.
+- `style`: attribute of `object` type with no default assigned. This is added when `margin` or `padding` support is declared. It stores the custom values set by the user, e.g.:
 
 ```js
-supports: {
-    spacing: {
-        margin: [ 'top', 'bottom' ], // Enable margin for arbitrary sides.
-        padding: true,               // Enable padding for all sides.
+attributes: {
+    style: {
+        margin: 'value',
+        padding: {
+            top: 'value',
+        }
     }
 }
 ```
 
-A spacing property may define an array of allowable sides that can be configured. When arbitrary sides are defined only UI controls for those sides are displayed. Axial sides are defined with the `vertical` and `horizontal` terms, and display a single UI control for each axial pair (for example, `vertical` controls both the top and bottom sides). A spacing property may support arbitrary individual sides **or** axial sides, but not a mix of both.
+A spacing property may define an array of allowable sides – 'top', 'right', 'bottom', 'left' – that can be configured. When such arbitrary sides are defined, only UI controls for those sides are displayed. 
 
+Axial sides are defined with the `vertical` and `horizontal` terms, and display a single UI control for each axial pair (for example, `vertical` controls both the top and bottom sides). A spacing property may support arbitrary individual sides **or** axial sides, but not a mix of both.
+
+Note: `blockGap` accepts `vertical` and `horizontal` axial sides, which adjust gap column and row values. `blockGap` doesn't support arbitrary sides.
+
+```js
+supports: {
+    spacing: {
+        margin: [ 'top', 'bottom' ],             // Enable margin for arbitrary sides.
+        padding: true,                           // Enable padding for all sides.
+        blockGap: [ 'horizontal', 'vertical' ],  // Enables axial (column/row) block spacing controls
+    }
+}
+```
 
 ## typography
 

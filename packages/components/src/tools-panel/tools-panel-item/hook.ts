@@ -36,15 +36,26 @@ export function useToolsPanelItem(
 		flagItemCustomization,
 		isResetting,
 		shouldRenderPlaceholderItems: shouldRenderPlaceholder,
+		firstDisplayedItem,
+		lastDisplayedItem,
+		__experimentalFirstVisibleItemClass,
+		__experimentalLastVisibleItemClass,
 	} = useToolsPanelContext();
 
-	const hasValueCallback = useCallback( hasValue, [ panelId ] );
-	const resetAllFilterCallback = useCallback( resetAllFilter, [ panelId ] );
+	const hasValueCallback = useCallback( hasValue, [ panelId, hasValue ] );
+	const resetAllFilterCallback = useCallback( resetAllFilter, [
+		panelId,
+		resetAllFilter,
+	] );
+	const previousPanelId = usePrevious( currentPanelId );
+
+	const hasMatchingPanel =
+		currentPanelId === panelId || currentPanelId === null;
 
 	// Registering the panel item allows the panel to include it in its
 	// automatically generated menu and determine its initial checked status.
 	useEffect( () => {
-		if ( currentPanelId === panelId ) {
+		if ( hasMatchingPanel && previousPanelId !== null ) {
 			registerPanelItem( {
 				hasValue: hasValueCallback,
 				isShownByDefault,
@@ -55,17 +66,24 @@ export function useToolsPanelItem(
 		}
 
 		return () => {
-			if ( currentPanelId === panelId ) {
+			if (
+				( previousPanelId === null && !! currentPanelId ) ||
+				currentPanelId === panelId
+			) {
 				deregisterPanelItem( label );
 			}
 		};
 	}, [
 		currentPanelId,
-		panelId,
+		hasMatchingPanel,
 		isShownByDefault,
 		label,
 		hasValueCallback,
+		panelId,
+		previousPanelId,
 		resetAllFilterCallback,
+		registerPanelItem,
+		deregisterPanelItem,
 	] );
 
 	const isValueSet = hasValue();
@@ -77,7 +95,13 @@ export function useToolsPanelItem(
 		if ( isShownByDefault && isValueSet && ! wasValueSet ) {
 			flagItemCustomization( label );
 		}
-	}, [ isValueSet, wasValueSet, isShownByDefault, label ] );
+	}, [
+		isValueSet,
+		wasValueSet,
+		isShownByDefault,
+		label,
+		flagItemCustomization,
+	] );
 
 	// Note: `label` is used as a key when building menu item state in
 	// `ToolsPanel`.
@@ -88,7 +112,7 @@ export function useToolsPanelItem(
 	// Determine if the panel item's corresponding menu is being toggled and
 	// trigger appropriate callback if it is.
 	useEffect( () => {
-		if ( isResetting || currentPanelId !== panelId ) {
+		if ( isResetting || ! hasMatchingPanel ) {
 			return;
 		}
 
@@ -100,12 +124,13 @@ export function useToolsPanelItem(
 			onDeselect?.();
 		}
 	}, [
-		currentPanelId,
+		hasMatchingPanel,
 		isMenuItemChecked,
 		isResetting,
 		isValueSet,
-		panelId,
 		wasMenuItemChecked,
+		onSelect,
+		onDeselect,
 	] );
 
 	// The item is shown if it is a default control regardless of whether it
@@ -121,8 +146,28 @@ export function useToolsPanelItem(
 			shouldRenderPlaceholder &&
 			! isShown &&
 			styles.ToolsPanelItemPlaceholder;
-		return cx( styles.ToolsPanelItem, placeholderStyle, className );
-	}, [ isShown, shouldRenderPlaceholder, className ] );
+		const firstItemStyle =
+			firstDisplayedItem === label && __experimentalFirstVisibleItemClass;
+		const lastItemStyle =
+			lastDisplayedItem === label && __experimentalLastVisibleItemClass;
+		return cx(
+			styles.ToolsPanelItem,
+			placeholderStyle,
+			className,
+			firstItemStyle,
+			lastItemStyle
+		);
+	}, [
+		isShown,
+		shouldRenderPlaceholder,
+		className,
+		cx,
+		firstDisplayedItem,
+		lastDisplayedItem,
+		__experimentalFirstVisibleItemClass,
+		__experimentalLastVisibleItemClass,
+		label,
+	] );
 
 	return {
 		...otherProps,

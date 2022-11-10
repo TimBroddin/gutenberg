@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { includes, map, without } from 'lodash';
+import { map } from 'lodash';
 
 /**
  * WordPress dependencies
@@ -23,11 +23,11 @@ function BlockManagerCategory( { title, blockTypes } ) {
 	const { defaultAllowedBlockTypes, hiddenBlockTypes } = useSelect(
 		( select ) => {
 			const { getEditorSettings } = select( editorStore );
-			const { getPreference } = select( editPostStore );
+			const { getHiddenBlockTypes } = select( editPostStore );
 			return {
-				defaultAllowedBlockTypes: getEditorSettings()
-					.defaultAllowedBlockTypes,
-				hiddenBlockTypes: getPreference( 'hiddenBlockTypes' ),
+				defaultAllowedBlockTypes:
+					getEditorSettings().defaultAllowedBlockTypes,
+				hiddenBlockTypes: getHiddenBlockTypes(),
 			};
 		},
 		[]
@@ -37,7 +37,7 @@ function BlockManagerCategory( { title, blockTypes } ) {
 			return blockTypes;
 		}
 		return blockTypes.filter( ( { name } ) => {
-			return includes( defaultAllowedBlockTypes || [], name );
+			return defaultAllowedBlockTypes?.includes( name );
 		} );
 	}, [ defaultAllowedBlockTypes, blockTypes ] );
 	const { showBlockTypes, hideBlockTypes } = useDispatch( editPostStore );
@@ -64,9 +64,8 @@ function BlockManagerCategory( { title, blockTypes } ) {
 		return null;
 	}
 
-	const checkedBlockNames = without(
-		map( filteredBlockTypes, 'name' ),
-		...hiddenBlockTypes
+	const checkedBlockNames = map( filteredBlockTypes, 'name' ).filter(
+		( type ) => ! hiddenBlockTypes.includes( type )
 	);
 
 	const titleId = 'edit-post-block-manager__category-title-' + instanceId;

@@ -1,14 +1,7 @@
 /**
  * External dependencies
  */
-import {
-	mergeWith,
-	pickBy,
-	isEmpty,
-	isObject,
-	identity,
-	mapValues,
-} from 'lodash';
+import { mergeWith, isEmpty, mapValues } from 'lodash';
 
 /**
  * WordPress dependencies
@@ -31,26 +24,30 @@ function mergeTreesCustomizer( _, srcValue ) {
 	}
 }
 
-function mergeBaseAndUserConfigs( base, user ) {
+export function mergeBaseAndUserConfigs( base, user ) {
 	return mergeWith( {}, base, user, mergeTreesCustomizer );
 }
 
 const cleanEmptyObject = ( object ) => {
-	if ( ! isObject( object ) || Array.isArray( object ) ) {
+	if (
+		object === null ||
+		typeof object !== 'object' ||
+		Array.isArray( object )
+	) {
 		return object;
 	}
-	const cleanedNestedObjects = pickBy(
-		mapValues( object, cleanEmptyObject ),
-		identity
+	const cleanedNestedObjects = Object.fromEntries(
+		Object.entries( mapValues( object, cleanEmptyObject ) ).filter(
+			( [ , value ] ) => Boolean( value )
+		)
 	);
 	return isEmpty( cleanedNestedObjects ) ? undefined : cleanedNestedObjects;
 };
 
 function useGlobalStylesUserConfig() {
 	const { globalStylesId, settings, styles } = useSelect( ( select ) => {
-		const _globalStylesId = select(
-			coreStore
-		).__experimentalGetCurrentGlobalStylesId();
+		const _globalStylesId =
+			select( coreStore ).__experimentalGetCurrentGlobalStylesId();
 		const record = _globalStylesId
 			? select( coreStore ).getEditedEntityRecord(
 					'root',
@@ -67,7 +64,6 @@ function useGlobalStylesUserConfig() {
 
 	const { getEditedEntityRecord } = useSelect( coreStore );
 	const { editEntityRecord } = useDispatch( coreStore );
-
 	const config = useMemo( () => {
 		return {
 			settings: settings ?? {},
@@ -109,11 +105,8 @@ function useGlobalStylesBaseConfig() {
 }
 
 function useGlobalStylesContext() {
-	const [
-		isUserConfigReady,
-		userConfig,
-		setUserConfig,
-	] = useGlobalStylesUserConfig();
+	const [ isUserConfigReady, userConfig, setUserConfig ] =
+		useGlobalStylesUserConfig();
 	const [ isBaseConfigReady, baseConfig ] = useGlobalStylesBaseConfig();
 	const mergedConfig = useMemo( () => {
 		if ( ! baseConfig || ! userConfig ) {

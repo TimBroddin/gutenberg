@@ -1,16 +1,11 @@
 /**
- * External dependencies
- */
-import { noop } from 'lodash';
-
-/**
  * WordPress dependencies
  */
 import {
 	__experimentalVStack as VStack,
 	__experimentalPaletteEdit as PaletteEdit,
+	__experimentalSpacer as Spacer,
 	DuotonePicker,
-	__experimentalHeading as Heading,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
@@ -18,6 +13,9 @@ import { __ } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useSetting } from './hooks';
+import Subtitle from './subtitle';
+
+const noop = () => {};
 
 export default function GradientPalettePanel( { name } ) {
 	const [ themeGradients, setThemeGradients ] = useSetting(
@@ -47,24 +45,23 @@ export default function GradientPalettePanel( { name } ) {
 		'color.defaultGradients',
 		name
 	);
-	const [ duotonePalette ] = useSetting( 'color.duotone' ) || [];
+
+	const [ customDuotone ] = useSetting( 'color.duotone.custom' ) || [];
+	const [ defaultDuotone ] = useSetting( 'color.duotone.default' ) || [];
+	const [ themeDuotone ] = useSetting( 'color.duotone.theme' ) || [];
+	const [ defaultDuotoneEnabled ] = useSetting( 'color.defaultDuotone' );
+
+	const duotonePalette = [
+		...( customDuotone || [] ),
+		...( themeDuotone || [] ),
+		...( defaultDuotone && defaultDuotoneEnabled ? defaultDuotone : [] ),
+	];
+
 	return (
 		<VStack
 			className="edit-site-global-styles-gradient-palette-panel"
 			spacing={ 10 }
 		>
-			<div>
-				<Heading className="edit-site-global-styles-gradient-palette-panel__duotone-heading">
-					{ __( 'Duotone' ) }
-				</Heading>
-				<DuotonePicker
-					duotonePalette={ duotonePalette }
-					disableCustomDuotone={ true }
-					disableCustomColors={ true }
-					clearable={ false }
-					onChange={ noop }
-				/>
-			</div>
 			{ !! themeGradients && !! themeGradients.length && (
 				<PaletteEdit
 					canReset={ themeGradients !== baseThemeGradients }
@@ -94,6 +91,19 @@ export default function GradientPalettePanel( { name } ) {
 				) }
 				slugPrefix="custom-"
 			/>
+			{ !! duotonePalette && !! duotonePalette.length && (
+				<div>
+					<Subtitle>{ __( 'Duotone' ) }</Subtitle>
+					<Spacer margin={ 3 } />
+					<DuotonePicker
+						duotonePalette={ duotonePalette }
+						disableCustomDuotone={ true }
+						disableCustomColors={ true }
+						clearable={ false }
+						onChange={ noop }
+					/>
+				</div>
+			) }
 		</VStack>
 	);
 }

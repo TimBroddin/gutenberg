@@ -18,6 +18,7 @@ import {
 } from '@wordpress/interface';
 import { __ } from '@wordpress/i18n';
 import { ShortcutProvider } from '@wordpress/keyboard-shortcuts';
+import { PluginArea } from '@wordpress/plugins';
 
 /**
  * Internal dependencies
@@ -54,9 +55,8 @@ const interfaceLabels = {
 
 export default function Layout( { blockEditorSettings } ) {
 	const contentAreaRef = useBlockSelectionClearer();
-	const [ isMenuNameControlFocused, setIsMenuNameControlFocused ] = useState(
-		false
-	);
+	const [ isMenuNameControlFocused, setIsMenuNameControlFocused ] =
+		useState( false );
 	const { saveNavigationPost } = useDispatch( editNavigationStore );
 	const savePost = () => saveNavigationPost( navigationPost );
 
@@ -200,6 +200,7 @@ export default function Layout( { blockEditorSettings } ) {
 						<UnsavedChangesWarning />
 					</BlockEditorProvider>
 					<Popover.Slot />
+					<PluginArea />
 				</SlotFillProvider>
 			</ShortcutProvider>
 		</ErrorBoundary>

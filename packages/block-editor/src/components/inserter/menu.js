@@ -1,7 +1,19 @@
 /**
+ * External dependencies
+ */
+import classnames from 'classnames';
+
+/**
  * WordPress dependencies
  */
-import { useState, useCallback, useMemo } from '@wordpress/element';
+import {
+	forwardRef,
+	useState,
+	useCallback,
+	useMemo,
+	useImperativeHandle,
+	useRef,
+} from '@wordpress/element';
 import { VisuallyHidden, SearchControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { useSelect } from '@wordpress/data';
@@ -12,55 +24,57 @@ import { useSelect } from '@wordpress/data';
 import Tips from './tips';
 import InserterPreviewPanel from './preview-panel';
 import BlockTypesTab from './block-types-tab';
-import BlockPatternsTabs from './block-patterns-tab';
+import BlockPatternsTabs, {
+	BlockPatternsCategoryDialog,
+} from './block-patterns-tab';
 import ReusableBlocksTab from './reusable-blocks-tab';
 import InserterSearchResults from './search-results';
 import useInsertionPoint from './hooks/use-insertion-point';
 import InserterTabs from './tabs';
 import { store as blockEditorStore } from '../../store';
 
-function InserterMenu( {
-	rootClientId,
-	clientId,
-	isAppender,
-	__experimentalInsertionIndex,
-	onSelect,
-	showInserterHelpPanel,
-	showMostUsedBlocks,
-	__experimentalFilterValue = '',
-	shouldFocusBlock = true,
-} ) {
+function InserterMenu(
+	{
+		rootClientId,
+		clientId,
+		isAppender,
+		__experimentalInsertionIndex,
+		onSelect,
+		showInserterHelpPanel,
+		showMostUsedBlocks,
+		__experimentalFilterValue = '',
+		shouldFocusBlock = true,
+		prioritizePatterns,
+	},
+	ref
+) {
 	const [ filterValue, setFilterValue ] = useState(
 		__experimentalFilterValue
 	);
 	const [ hoveredItem, setHoveredItem ] = useState( null );
-	const [ selectedPatternCategory, setSelectedPatternCategory ] = useState(
-		null
-	);
+	const [ selectedPatternCategory, setSelectedPatternCategory ] =
+		useState( null );
+	const [ selectedTab, setSelectedTab ] = useState( null );
 
-	const [
-		destinationRootClientId,
-		onInsertBlocks,
-		onToggleInsertionPoint,
-	] = useInsertionPoint( {
-		rootClientId,
-		clientId,
-		isAppender,
-		insertionIndex: __experimentalInsertionIndex,
-		shouldFocusBlock,
-	} );
+	const [ destinationRootClientId, onInsertBlocks, onToggleInsertionPoint ] =
+		useInsertionPoint( {
+			rootClientId,
+			clientId,
+			isAppender,
+			insertionIndex: __experimentalInsertionIndex,
+			shouldFocusBlock,
+		} );
 	const { showPatterns, hasReusableBlocks } = useSelect(
 		( select ) => {
-			const { __experimentalGetAllowedPatterns, getSettings } = select(
-				blockEditorStore
-			);
+			const { __experimentalGetAllowedPatterns, getSettings } =
+				select( blockEditorStore );
 
 			return {
 				showPatterns: !! __experimentalGetAllowedPatterns(
 					destinationRootClientId
 				).length,
-				hasReusableBlocks: !! getSettings().__experimentalReusableBlocks
-					?.length,
+				hasReusableBlocks:
+					!! getSettings().__experimentalReusableBlocks?.length,
 			};
 		},
 		[ destinationRootClientId ]
@@ -133,7 +147,7 @@ function InserterMenu( {
 			<BlockPatternsTabs
 				rootClientId={ destinationRootClientId }
 				onInsert={ onInsertPattern }
-				onClickCategory={ onClickPatternCategory }
+				onSelectCategory={ onClickPatternCategory }
 				selectedCategory={ selectedPatternCategory }
 			/>
 		),
@@ -168,22 +182,37 @@ function InserterMenu( {
 		[ blocksTab, patternsTab, reusableBlocksTab ]
 	);
 
+	const searchRef = useRef();
+	useImperativeHandle( ref, () => ( {
+		focusSearch: () => {
+			searchRef.current.focus();
+		},
+	} ) );
+
+	const showPatternPanel =
+		selectedTab === 'patterns' && ! filterValue && selectedPatternCategory;
+	const showAsTabs = ! filterValue && ( showPatterns || hasReusableBlocks );
+
 	return (
 		<div className="block-editor-inserter__menu">
-			<div className="block-editor-inserter__main-area">
-				{ /* the following div is necessary to fix the sticky position of the search form */ }
-				<div className="block-editor-inserter__content">
-					<SearchControl
-						className="block-editor-inserter__search"
-						onChange={ ( value ) => {
-							if ( hoveredItem ) setHoveredItem( null );
-							setFilterValue( value );
-						} }
-						value={ filterValue }
-						label={ __( 'Search for blocks and patterns' ) }
-						placeholder={ __( 'Search' ) }
-					/>
-					{ !! filterValue && (
+			<div
+				className={ classnames( 'block-editor-inserter__main-area', {
+					'show-as-tabs': showAsTabs,
+				} ) }
+			>
+				<SearchControl
+					className="block-editor-inserter__search"
+					onChange={ ( value ) => {
+						if ( hoveredItem ) setHoveredItem( null );
+						setFilterValue( value );
+					} }
+					value={ filterValue }
+					label={ __( 'Search for blocks and patterns' ) }
+					placeholder={ __( 'Search' ) }
+					ref={ searchRef }
+				/>
+				{ !! filterValue && (
+					<div className="block-editor-inserter__no-tab-container">
 						<InserterSearchResults
 							filterValue={ filterValue }
 							onSelect={ onSelect }
@@ -197,26 +226,36 @@ function InserterMenu( {
 							showBlockDirectory
 							shouldFocusBlock={ shouldFocusBlock }
 						/>
-					) }
-					{ ! filterValue && ( showPatterns || hasReusableBlocks ) && (
-						<InserterTabs
-							showPatterns={ showPatterns }
-							showReusableBlocks={ hasReusableBlocks }
-						>
-							{ getCurrentTab }
-						</InserterTabs>
-					) }
-					{ ! filterValue &&
-						! showPatterns &&
-						! hasReusableBlocks &&
-						blocksTab }
-				</div>
+					</div>
+				) }
+				{ showAsTabs && (
+					<InserterTabs
+						showPatterns={ showPatterns }
+						showReusableBlocks={ hasReusableBlocks }
+						prioritizePatterns={ prioritizePatterns }
+						onSelect={ setSelectedTab }
+					>
+						{ getCurrentTab }
+					</InserterTabs>
+				) }
+				{ ! filterValue && ! showAsTabs && (
+					<div className="block-editor-inserter__no-tab-container">
+						{ blocksTab }
+					</div>
+				) }
 			</div>
 			{ showInserterHelpPanel && hoveredItem && (
 				<InserterPreviewPanel item={ hoveredItem } />
+			) }
+			{ showPatternPanel && (
+				<BlockPatternsCategoryDialog
+					rootClientId={ destinationRootClientId }
+					onInsert={ onInsertPattern }
+					category={ selectedPatternCategory }
+				/>
 			) }
 		</div>
 	);
 }
 
-export default InserterMenu;
+export default forwardRef( InserterMenu );

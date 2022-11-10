@@ -10,6 +10,8 @@ import {
 import { __ } from '@wordpress/i18n';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as noticesStore } from '@wordpress/notices';
+import { store as preferencesStore } from '@wordpress/preferences';
 
 /**
  * Internal dependencies
@@ -22,13 +24,15 @@ function KeyboardShortcuts() {
 		getEditorMode,
 		isEditorSidebarOpened,
 		isListViewOpened,
+		isFeatureActive,
 	} = useSelect( editPostStore );
 	const isModeToggleDisabled = useSelect( ( select ) => {
-		const { richEditingEnabled, codeEditingEnabled } = select(
-			editorStore
-		).getEditorSettings();
+		const { richEditingEnabled, codeEditingEnabled } =
+			select( editorStore ).getEditorSettings();
 		return ! richEditingEnabled || ! codeEditingEnabled;
 	}, [] );
+
+	const { createInfoNotice } = useDispatch( noticesStore );
 
 	const {
 		switchEditorMode,
@@ -36,8 +40,18 @@ function KeyboardShortcuts() {
 		closeGeneralSidebar,
 		toggleFeature,
 		setIsListViewOpened,
+		setIsInserterOpened,
 	} = useDispatch( editPostStore );
 	const { registerShortcut } = useDispatch( keyboardShortcutsStore );
+
+	const { set: setPreference } = useDispatch( preferencesStore );
+
+	const toggleDistractionFree = () => {
+		setPreference( 'core/edit-post', 'fixedToolbar', false );
+		setIsInserterOpened( false );
+		setIsListViewOpened( false );
+		closeGeneralSidebar();
+	};
 
 	useEffect( () => {
 		registerShortcut( {
@@ -47,6 +61,16 @@ function KeyboardShortcuts() {
 			keyCombination: {
 				modifier: 'secondary',
 				character: 'm',
+			},
+		} );
+
+		registerShortcut( {
+			name: 'core/edit-post/toggle-distraction-free',
+			category: 'global',
+			description: __( 'Toggle distraction free mode.' ),
+			keyCombination: {
+				modifier: 'primaryShift',
+				character: '\\',
 			},
 		} );
 
@@ -137,6 +161,22 @@ function KeyboardShortcuts() {
 
 	useShortcut( 'core/edit-post/toggle-fullscreen', () => {
 		toggleFeature( 'fullscreenMode' );
+	} );
+
+	useShortcut( 'core/edit-post/toggle-distraction-free', () => {
+		closeGeneralSidebar();
+		setIsListViewOpened( false );
+		toggleDistractionFree();
+		toggleFeature( 'distractionFree' );
+		createInfoNotice(
+			isFeatureActive( 'distractionFree' )
+				? __( 'Distraction free mode turned on.' )
+				: __( 'Distraction free mode turned off.' ),
+			{
+				id: 'core/edit-post/distraction-free-mode/notice',
+				type: 'snackbar',
+			}
+		);
 	} );
 
 	useShortcut( 'core/edit-post/toggle-sidebar', ( event ) => {

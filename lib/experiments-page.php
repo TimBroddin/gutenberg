@@ -40,15 +40,16 @@ function gutenberg_initialize_experiments_settings() {
 		'gutenberg_display_experiment_section',
 		'gutenberg-experiments'
 	);
+
 	add_settings_field(
-		'gutenberg-navigation',
-		__( 'Navigation', 'gutenberg' ),
+		'gutenberg-zoomed-out-view',
+		__( 'Zoomed out view ', 'gutenberg' ),
 		'gutenberg_display_experiment_field',
 		'gutenberg-experiments',
 		'gutenberg_experiments_section',
 		array(
-			'label' => __( 'Enable Navigation screen', 'gutenberg' ),
-			'id'    => 'gutenberg-navigation',
+			'label' => __( 'Test a new zoomed out view on the site editor (Warning: The new feature is not ready. You may experience UX issues that are being addressed)', 'gutenberg' ),
+			'id'    => 'gutenberg-zoomed-out-view',
 		)
 	);
 	register_setting(
@@ -105,9 +106,5 @@ function gutenberg_experiments_editor_settings( $settings ) {
 	);
 	return array_merge( $settings, $experiments_settings );
 }
-// This can be removed when plugin support requires WordPress 5.8.0+.
-if ( function_exists( 'get_block_editor_settings' ) ) {
-	add_filter( 'block_editor_settings_all', 'gutenberg_experiments_editor_settings' );
-} else {
-	add_filter( 'block_editor_settings', 'gutenberg_experiments_editor_settings' );
-}
+
+add_filter( 'block_editor_settings_all', 'gutenberg_experiments_editor_settings' );

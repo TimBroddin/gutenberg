@@ -1,12 +1,8 @@
 /**
  * WordPress dependencies
  */
+import { throttle } from '@wordpress/compose';
 import { useEffect, useRef } from '@wordpress/element';
-
-/**
- * External dependencies
- */
-import { throttle } from 'lodash';
 
 const dragImageClass = 'components-draggable__invisible-drag-image';
 const cloneWrapperClass = 'components-draggable__clone';
@@ -143,10 +139,10 @@ export default function Draggable( {
 			y = elementTopOffset - clonePadding;
 			cloneWrapper.style.transform = `translate( ${ x }px, ${ y }px )`;
 
-			// Hack: Remove iFrames as it's causing the embeds drag clone to freeze
-			Array.from(
-				clone.querySelectorAll( 'iframe' )
-			).forEach( ( child ) => child.parentNode.removeChild( child ) );
+			// Hack: Remove iFrames as it's causing the embeds drag clone to freeze.
+			Array.from( clone.querySelectorAll( 'iframe' ) ).forEach(
+				( child ) => child.parentNode.removeChild( child )
+			);
 
 			cloneWrapper.appendChild( clone );
 
@@ -162,7 +158,7 @@ export default function Draggable( {
 		 * @param {import('react').DragEvent<Element>} e
 		 */
 		function over( e ) {
-			//Skip doing any work if mouse has not moved.
+			// Skip doing any work if mouse has not moved.
 			if ( cursorLeft === e.clientX && cursorTop === e.clientY ) {
 				return;
 			}
@@ -180,6 +176,7 @@ export default function Draggable( {
 
 		// Aim for 60fps (16 ms per frame) for now. We can potentially use requestAnimationFrame (raf) instead,
 		// note that browsers may throttle raf below 60fps in certain conditions.
+		// @ts-ignore
 		const throttledDragOver = throttle( over, 16 );
 
 		ownerDocument.addEventListener( 'dragover', throttledDragOver );
@@ -199,7 +196,7 @@ export default function Draggable( {
 		}
 
 		cleanup.current = () => {
-			// Remove drag clone
+			// Remove drag clone.
 			if ( cloneWrapper && cloneWrapper.parentNode ) {
 				cloneWrapper.parentNode.removeChild( cloneWrapper );
 			}

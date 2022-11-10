@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { get, map, keyBy } from 'lodash';
+import { map } from 'lodash';
 import createSelector from 'rememo';
 
 /**
@@ -9,9 +9,11 @@ import createSelector from 'rememo';
  */
 import { store as coreDataStore } from '@wordpress/core-data';
 import { createRegistrySelector } from '@wordpress/data';
+import deprecated from '@wordpress/deprecated';
 import { uploadMedia } from '@wordpress/media-utils';
 import { isTemplatePart } from '@wordpress/blocks';
 import { Platform } from '@wordpress/element';
+import { store as preferencesStore } from '@wordpress/preferences';
 
 /**
  * Internal dependencies
@@ -32,15 +34,34 @@ import {
  */
 
 /**
+ * Helper for getting a preference from the preferences store.
+ *
+ * This is only present so that `getSettings` doesn't need to be made a
+ * registry selector.
+ *
+ * It's unstable because the selector needs to be exported and so part of the
+ * public API to work.
+ */
+export const __unstableGetPreference = createRegistrySelector(
+	( select ) => ( state, name ) =>
+		select( preferencesStore ).get( 'core/edit-site', name )
+);
+
+/**
  * Returns whether the given feature is enabled or not.
  *
- * @param {Object} state   Global application state.
- * @param {string} feature Feature slug.
+ * @param {Object} state       Global application state.
+ * @param {string} featureName Feature slug.
  *
  * @return {boolean} Is active.
  */
-export function isFeatureActive( state, feature ) {
-	return get( state.preferences.features, [ feature ], false );
+export function isFeatureActive( state, featureName ) {
+	deprecated( `select( 'core/interface' ).isFeatureActive`, {
+		since: '6.0',
+		alternative: `select( 'core/preferences' ).get`,
+	} );
+
+	return !! __unstableGetPreference( state, featureName );
 }
 
 /**
@@ -61,8 +82,8 @@ export function __experimentalGetPreviewDeviceType( state ) {
  *
  * @return {Object} Whether the current user can create media or not.
  */
-export const getCanUserCreateMedia = createRegistrySelector( ( select ) => () =>
-	select( coreDataStore ).canUser( 'create', 'media' )
+export const getCanUserCreateMedia = createRegistrySelector(
+	( select ) => () => select( coreDataStore ).canUser( 'create', 'media' )
 );
 
 /**
@@ -94,10 +115,23 @@ export const getSettings = createSelector(
 		const settings = {
 			...state.settings,
 			outlineMode: true,
-			focusMode: isFeatureActive( state, 'focusMode' ),
-			hasFixedToolbar: isFeatureActive( state, 'fixedToolbar' ),
+			focusMode: !! __unstableGetPreference( state, 'focusMode' ),
+			hasFixedToolbar: !! __unstableGetPreference(
+				state,
+				'fixedToolbar'
+			),
+			keepCaretInsideBlock: !! __unstableGetPreference(
+				state,
+				'keepCaretInsideBlock'
+			),
+			showIconLabels: !! __unstableGetPreference(
+				state,
+				'showIconLabels'
+			),
 			__experimentalSetIsInserterOpened: setIsInserterOpen,
 			__experimentalReusableBlocks: getReusableBlocks( state ),
+			__experimentalPreferPatternsOnRoot:
+				'wp_template' === getEditedPostType( state ),
 		};
 
 		const canUserCreateMedia = getCanUserCreateMedia( state );
@@ -117,9 +151,12 @@ export const getSettings = createSelector(
 	( state ) => [
 		getCanUserCreateMedia( state ),
 		state.settings,
-		isFeatureActive( state, 'focusMode' ),
-		isFeatureActive( state, 'fixedToolbar' ),
+		__unstableGetPreference( state, 'focusMode' ),
+		__unstableGetPreference( state, 'fixedToolbar' ),
+		__unstableGetPreference( state, 'keepCaretInsideBlock' ),
+		__unstableGetPreference( state, 'showIconLabels' ),
 		getReusableBlocks( state ),
+		getEditedPostType( state ),
 	]
 );
 
@@ -267,11 +304,8 @@ export function isInserterOpened( state ) {
  * @return {Object} The root client ID, index to insert at and starting filter value.
  */
 export function __experimentalGetInsertionPoint( state ) {
-	const {
-		rootClientId,
-		insertionIndex,
-		filterValue,
-	} = state.blockInserterPanel;
+	const { rootClientId, insertionIndex, filterValue } =
+		state.blockInserterPanel;
 	return { rootClientId, insertionIndex, filterValue };
 }
 
@@ -284,6 +318,17 @@ export function __experimentalGetInsertionPoint( state ) {
  */
 export function isListViewOpened( state ) {
 	return state.listViewPanel;
+}
+
+/**
+ * Returns the current opened/closed state of the save panel.
+ *
+ * @param {Object} state Global application state.
+ *
+ * @return {boolean} True if the save panel should be open; false if closed.
+ */
+export function isSaveViewOpened( state ) {
+	return state.saveViewPanel;
 }
 
 /**
@@ -302,13 +347,21 @@ export const getCurrentTemplateTemplateParts = createRegistrySelector(
 			templateId
 		);
 
-		const templateParts = select(
-			coreDataStore
-		).getEntityRecords( 'postType', 'wp_template_part', { per_page: -1 } );
-		const templatePartsById = keyBy(
-			templateParts,
-			( templatePart ) => templatePart.id
+		const templateParts = select( coreDataStore ).getEntityRecords(
+			'postType',
+			'wp_template_part',
+			{ per_page: -1 }
 		);
+		const templatePartsById = templateParts
+			? // Key template parts by their ID.
+			  templateParts.reduce(
+					( newTemplateParts, part ) => ( {
+						...newTemplateParts,
+						[ part.id ]: part,
+					} ),
+					{}
+			  )
+			: {};
 
 		return ( template.blocks ?? [] )
 			.filter( ( block ) => isTemplatePart( block ) )
@@ -327,3 +380,14 @@ export const getCurrentTemplateTemplateParts = createRegistrySelector(
 			.filter( ( { templatePart } ) => !! templatePart );
 	}
 );
+
+/**
+ * Returns the current editing mode.
+ *
+ * @param {Object} state Global application state.
+ *
+ * @return {string} Editing mode.
+ */
+export function getEditorMode( state ) {
+	return __unstableGetPreference( state, 'editorMode' );
+}

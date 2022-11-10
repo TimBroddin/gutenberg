@@ -2,27 +2,23 @@
  * WordPress dependencies
  */
 import {
-	trashAllPosts,
+	deleteAllTemplates,
 	activateTheme,
 	getAllBlocks,
 	selectBlockByClientId,
 	insertBlock,
+	visitSiteEditor,
 } from '@wordpress/e2e-test-utils';
-
-/**
- * Internal dependencies
- */
-import { siteEditor } from './utils';
 
 async function toggleSidebar() {
 	await page.click(
-		'.edit-site-header__actions button[aria-label="Settings"]'
+		'.edit-site-header-edit-mode__actions button[aria-label="Settings"]'
 	);
 }
 
 async function getActiveTabLabel() {
 	return await page.$eval(
-		'.edit-site-sidebar__panel-tab.is-active',
+		'.edit-site-sidebar-edit-mode__panel-tab.is-active',
 		( element ) => element.getAttribute( 'aria-label' )
 	);
 }
@@ -42,18 +38,17 @@ async function getTemplateCard() {
 
 describe( 'Settings sidebar', () => {
 	beforeAll( async () => {
-		await activateTheme( 'tt1-blocks' );
-		await trashAllPosts( 'wp_template' );
-		await trashAllPosts( 'wp_template_part' );
+		await activateTheme( 'emptytheme' );
+		await deleteAllTemplates( 'wp_template' );
+		await deleteAllTemplates( 'wp_template_part' );
 	} );
 	afterAll( async () => {
-		await trashAllPosts( 'wp_template' );
-		await trashAllPosts( 'wp_template_part' );
+		await deleteAllTemplates( 'wp_template' );
+		await deleteAllTemplates( 'wp_template_part' );
 		await activateTheme( 'twentytwentyone' );
 	} );
 	beforeEach( async () => {
-		await siteEditor.visit();
-		await siteEditor.disableWelcomeGuide();
+		await visitSiteEditor();
 	} );
 
 	describe( 'Template tab', () => {
@@ -69,8 +64,8 @@ describe( 'Settings sidebar', () => {
 			await toggleSidebar();
 
 			const templateCardBeforeNavigation = await getTemplateCard();
-			await siteEditor.visit( {
-				postId: 'tt1-blocks//404',
+			await visitSiteEditor( {
+				postId: 'emptytheme//singular',
 				postType: 'wp_template',
 			} );
 			const templateCardAfterNavigation = await getTemplateCard();
@@ -80,8 +75,8 @@ describe( 'Settings sidebar', () => {
 				description: 'Displays posts.',
 			} );
 			expect( templateCardAfterNavigation ).toMatchObject( {
-				title: '404',
-				description: 'Displays when no content is found.',
+				title: 'Singular',
+				description: 'Displays a single post or page.',
 			} );
 		} );
 	} );

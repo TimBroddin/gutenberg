@@ -17,6 +17,7 @@ A test can be structured with the following parts:
 
 We also include examples of common tasks as well as tips in the following sections:
 
+-   [Helpers](#helpers)
 -   [Common flows](#common-flows)
 -   [Tools](#tools)
 -   [Common pitfalls and caveats](#common-pitfalls-and-caveats)
@@ -89,7 +90,7 @@ const initialHtml = `<!-- wp:buttons -->
 <div class="wp-block-button"><a class="wp-block-button__link" style="border-radius:5px" >Hello</a></div>
 <!-- /wp:button --></div>
 <!-- /wp:buttons -->`;
-const { getByA11yLabel } = await initializeEditor( {
+const { getByA11yLabel } = initializeEditor( {
 	initialHtml,
 } );
 ```
@@ -181,13 +182,13 @@ fireEvent( heightSlider, 'valueChange', '50' );
 
 ## Expect correct element behaviour
 
-After querying elements and firing events, we have to verify that the logic works as expected, for this purpose we can use the same `expect` function from Jest as we use in unit tests.
+After querying elements and firing events, we must verify that the logic works as expected. For this purpose we can use the same `expect` function from Jest that we use in unit tests. It is recommended to use the custom `toBeVisible` matcher to ensure the element is defined, is a valid React element, and visible.
 
 Here is an example:
 
 ```js
 const translatedTableTitle = within( missingBlock ).getByText( 'Tabla' );
-expect( translatedTableTitle ).toBeDefined();
+expect( translatedTableTitle ).toBeVisible();
 ```
 
 Additionally when rendering the entire editor, we can also verify if the HTML output is what we expect:
@@ -210,6 +211,10 @@ afterAll( () => {
 	} );
 } );
 ```
+
+## Helpers
+
+In the spirit of making easier writing integration tests for the native version, you can find a list of helper functions in [this README](https://github.com/WordPress/gutenberg/blob/HEAD/test/native/integration-test-helpers/README.md).
 
 ## Common flows
 
@@ -338,7 +343,7 @@ If you have trouble locating an element’s identifier, you may wish to use Xcod
 
 ### False positives when omitting `await` before `waitFor` function
 
-Omitting the `await` before a `waitFor` can lead to scenarios where tests pass but are not testing the intended behaviour. For example, if `toBeDefined` is used to assert the result of a call to `waitFor`, the assertion will pass because `waitFor` returns a value, even though it’s not the `ReactTestInstance` we meant to check for.
+Omitting the `await` before a `waitFor` can lead to scenarios where tests pass but are not testing the intended behaviour. For example, if `toBeDefined` is used to assert the result of a call to `waitFor`, the assertion will pass because `waitFor` returns a value, even though it is not the `ReactTestInstance` we meant to check for. For this reason, it is recommended to use the custom matcher `toBeVisible` which guards against this type of false positive.
 
 ### `waitFor` timeout
 

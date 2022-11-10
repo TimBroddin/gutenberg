@@ -8,6 +8,7 @@ import {
 	__unstableEditorStyles as EditorStyles,
 	__unstableIframe as Iframe,
 	__unstableUseMouseMoveTypingReset as useMouseMoveTypingReset,
+	store as blockEditorStore,
 } from '@wordpress/block-editor';
 import { useSelect } from '@wordpress/data';
 import { useMergeRefs } from '@wordpress/compose';
@@ -36,10 +37,15 @@ const HANDLE_STYLES_OVERRIDE = {
 	left: undefined,
 };
 
-function ResizableEditor( { enableResizing, settings, ...props } ) {
-	const deviceType = useSelect(
-		( select ) =>
-			select( editSiteStore ).__experimentalGetPreviewDeviceType(),
+function ResizableEditor( { enableResizing, settings, children, ...props } ) {
+	const { deviceType, isZoomOutMode } = useSelect(
+		( select ) => ( {
+			deviceType:
+				select( editSiteStore ).__experimentalGetPreviewDeviceType(),
+			isZoomOutMode:
+				select( blockEditorStore ).__unstableGetEditorMode() ===
+				'zoom-out',
+		} ),
 		[]
 	);
 	const deviceStyles = useResizeCanvas( deviceType );
@@ -51,31 +57,39 @@ function ResizableEditor( { enableResizing, settings, ...props } ) {
 
 	useEffect(
 		function autoResizeIframeHeight() {
-			const iframe = iframeRef.current;
-
-			if ( ! iframe || ! enableResizing ) {
+			if ( ! iframeRef.current || ! enableResizing ) {
 				return;
 			}
 
-			const resizeObserver = new iframe.contentWindow.ResizeObserver(
-				() => {
-					setHeight(
-						iframe.contentDocument.querySelector(
-							`.edit-site-block-editor__block-list`
-						).offsetHeight
-					);
-				}
-			);
+			const iframe = iframeRef.current;
 
-			// Observing the <html> rather than the <body> because the latter
-			// gets destroyed and remounted after initialization in <Iframe>.
-			resizeObserver.observe( iframe.contentDocument.documentElement );
+			function setFrameHeight() {
+				setHeight( iframe.contentDocument.body.scrollHeight );
+			}
+
+			let resizeObserver;
+
+			function registerObserver() {
+				resizeObserver?.disconnect();
+
+				resizeObserver = new iframe.contentWindow.ResizeObserver(
+					setFrameHeight
+				);
+
+				// Observe the body, since the `html` element seems to always
+				// have a height of `100%`.
+				resizeObserver.observe( iframe.contentDocument.body );
+				setFrameHeight();
+			}
+
+			iframe.addEventListener( 'load', registerObserver );
 
 			return () => {
-				resizeObserver.disconnect();
+				resizeObserver?.disconnect();
+				iframe.removeEventListener( 'load', registerObserver );
 			};
 		},
-		[ enableResizing ]
+		[ enableResizing, iframeRef.current ]
 	);
 
 	const resizeWidthBy = useCallback( ( deltaPixels ) => {
@@ -126,22 +140,41 @@ function ResizableEditor( { enableResizing, settings, ...props } ) {
 			} }
 		>
 			<Iframe
-				style={ enableResizing ? undefined : deviceStyles }
+				isZoomedOut={ isZoomOutMode }
+				style={ enableResizing ? { height } : deviceStyles }
 				head={
 					<>
 						<EditorStyles styles={ settings.styles } />
 						<style>{
 							// Forming a "block formatting context" to prevent margin collapsing.
 							// @see https://developer.mozilla.org/en-US/docs/Web/Guide/CSS/Block_formatting_context
-							`.edit-site-block-editor__block-list { display: flow-root; }`
+							`.is-root-container { display: flow-root; }`
 						}</style>
+						{ enableResizing && (
+							<style>
+								{
+									// Force the <html> and <body>'s heights to fit the content.
+									`html, body { height: -moz-fit-content !important; height: fit-content !important; min-height: 0 !important; }`
+								}
+								{
+									// Some themes will have `min-height: 100vh` for the root container,
+									// which isn't a requirement in auto resize mode.
+									`.is-root-container { min-height: 0 !important; }`
+								}
+							</style>
+						) }
 					</>
 				}
+				assets={ settings.__unstableResolvedAssets }
 				ref={ ref }
 				name="editor-canvas"
 				className="edit-site-visual-editor__editor-canvas"
 				{ ...props }
-			/>
+			>
+				{ /* Filters need to be rendered before children to avoid Safari rendering issues. */ }
+				{ settings.svgFilters }
+				{ children }
+			</Iframe>
 		</ResizableBox>
 	);
 }

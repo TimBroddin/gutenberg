@@ -1,9 +1,4 @@
 /**
- * External dependencies
- */
-import { castArray } from 'lodash';
-
-/**
  * WordPress dependencies
  */
 import { useDispatch, useSelect } from '@wordpress/data';
@@ -64,23 +59,17 @@ function useInsertionPoint( {
 				_destinationIndex = insertionIndex;
 			} else if ( clientId ) {
 				// Insert after a specific client ID.
-				_destinationIndex = getBlockIndex(
-					clientId,
-					_destinationRootClientId
-				);
+				_destinationIndex = getBlockIndex( clientId );
 			} else if ( ! isAppender && selectedBlockClientId ) {
 				_destinationRootClientId = getBlockRootClientId(
 					selectedBlockClientId
 				);
-				_destinationIndex =
-					getBlockIndex(
-						selectedBlockClientId,
-						_destinationRootClientId
-					) + 1;
+				_destinationIndex = getBlockIndex( selectedBlockClientId ) + 1;
 			} else {
 				// Insert at the end of the list.
-				_destinationIndex = getBlockOrder( _destinationRootClientId )
-					.length;
+				_destinationIndex = getBlockOrder(
+					_destinationRootClientId
+				).length;
 			}
 
 			return {
@@ -124,14 +113,11 @@ function useInsertionPoint( {
 					meta
 				);
 			}
+			const blockLength = Array.isArray( blocks ) ? blocks.length : 1;
 			const message = sprintf(
 				// translators: %d: the name of the block that has been added
-				_n(
-					'%d block added.',
-					'%d blocks added.',
-					castArray( blocks ).length
-				),
-				castArray( blocks ).length
+				_n( '%d block added.', '%d blocks added.', blockLength ),
+				blockLength
 			);
 			speak( message );
 

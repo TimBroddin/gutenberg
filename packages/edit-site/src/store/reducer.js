@@ -6,30 +6,7 @@ import { combineReducers } from '@wordpress/data';
 /**
  * Internal dependencies
  */
-import { PREFERENCES_DEFAULTS } from './defaults';
 import { MENU_ROOT } from '../components/navigation-sidebar/navigation-panel/constants';
-
-/**
- * Reducer returning the user preferences.
- *
- * @param {Object} state  Current state.
- * @param {Object} action Dispatched action.
- * @return {Object} Updated state.
- */
-export const preferences = combineReducers( {
-	features( state = PREFERENCES_DEFAULTS.features, action ) {
-		switch ( action.type ) {
-			case 'TOGGLE_FEATURE': {
-				return {
-					...state,
-					[ action.feature ]: ! state[ action.feature ],
-				};
-			}
-			default:
-				return state;
-		}
-	},
-} );
 
 /**
  * Reducer returning the editing canvas device type.
@@ -206,8 +183,25 @@ export function listViewPanel( state = false, action ) {
 	return state;
 }
 
+/**
+ * Reducer to set the save view panel open or closed.
+ *
+ * @param {Object} state  Current state.
+ * @param {Object} action Dispatched action.
+ */
+export function saveViewPanel( state = false, action ) {
+	switch ( action.type ) {
+		case 'OPEN_NAVIGATION_PANEL_TO_MENU':
+			return false;
+		case 'SET_IS_NAVIGATION_PANEL_OPENED':
+			return action.isOpen ? false : state;
+		case 'SET_IS_SAVE_VIEW_OPENED':
+			return action.isOpen;
+	}
+	return state;
+}
+
 export default combineReducers( {
-	preferences,
 	deviceType,
 	settings,
 	editedPost,
@@ -215,4 +209,5 @@ export default combineReducers( {
 	navigationPanel,
 	blockInserterPanel,
 	listViewPanel,
+	saveViewPanel,
 } );

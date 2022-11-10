@@ -1,7 +1,13 @@
 /**
+ * External dependencies
+ */
+import classnames from 'classnames';
+
+/**
  * WordPress dependencies
  */
 import { useSelect, useDispatch } from '@wordpress/data';
+import { useEffect, useRef } from '@wordpress/element';
 import {
 	Button,
 	Icon,
@@ -40,6 +46,16 @@ function NavigationToggle( { icon } ) {
 
 	const disableMotion = useReducedMotion();
 
+	const navigationToggleRef = useRef();
+
+	useEffect( () => {
+		// TODO: Remove this effect when alternative solution is merged.
+		// See: https://github.com/WordPress/gutenberg/pull/37314
+		if ( ! isNavigationOpen ) {
+			navigationToggleRef.current.focus();
+		}
+	}, [ isNavigationOpen ] );
+
 	const toggleNavigationPanel = () =>
 		setIsNavigationPanelOpened( ! isNavigationOpen );
 
@@ -47,9 +63,8 @@ function NavigationToggle( { icon } ) {
 
 	const effect = {
 		expand: {
-			scale: 1.7,
-			borderRadius: 0,
-			transition: { type: 'tween', duration: '0.2' },
+			scale: 1.25,
+			transition: { type: 'tween', duration: '0.3' },
 		},
 	};
 
@@ -68,6 +83,11 @@ function NavigationToggle( { icon } ) {
 		buttonIcon = <Icon size="36px" icon={ icon } />;
 	}
 
+	const classes = classnames( {
+		'edit-site-navigation-toggle__button': true,
+		'has-icon': siteIconUrl,
+	} );
+
 	return (
 		<motion.div
 			className={
@@ -77,8 +97,11 @@ function NavigationToggle( { icon } ) {
 			whileHover="expand"
 		>
 			<Button
-				className="edit-site-navigation-toggle__button has-icon"
+				className={ classes }
 				label={ __( 'Toggle navigation' ) }
+				ref={ navigationToggleRef }
+				// isPressed will add unwanted styles.
+				aria-pressed={ isNavigationOpen }
 				onClick={ toggleNavigationPanel }
 				showTooltip
 			>

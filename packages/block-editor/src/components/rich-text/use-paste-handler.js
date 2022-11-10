@@ -20,6 +20,7 @@ import { isURL } from '@wordpress/url';
 import { filePasteHandler } from './file-paste-handler';
 import { addActiveFormats, isShortcode } from './utils';
 import { splitValue } from './split-value';
+import { shouldDismissPastedFiles } from '../../utils/pasting';
 
 /** @typedef {import('@wordpress/rich-text').RichTextValue} RichTextValue */
 
@@ -62,7 +63,6 @@ export function usePasteHandler( props ) {
 			} = propsRef.current;
 
 			if ( ! isSelected ) {
-				event.preventDefault();
 				return;
 			}
 
@@ -155,9 +155,15 @@ export function usePasteHandler( props ) {
 				return;
 			}
 
-			// Only process file if no HTML is present.
-			// Note: a pasted file may have the URL as plain text.
-			if ( files && files.length && ! html ) {
+			// Process any attached files, unless we infer that the files in
+			// question are redundant "screenshots" of the actual HTML payload,
+			// as created by certain office-type programs.
+			//
+			// @see shouldDismissPastedFiles
+			if (
+				files?.length &&
+				! shouldDismissPastedFiles( files, html, plainText )
+			) {
 				const content = pasteHandler( {
 					HTML: filePasteHandler( files ),
 					mode: 'BLOCKS',
@@ -248,17 +254,29 @@ export function usePasteHandler( props ) {
 }
 
 /**
- * Normalizes a given string of HTML to remove the Windows specific "Fragment" comments
- * and any preceeding and trailing whitespace.
+ * Normalizes a given string of HTML to remove the Windows-specific "Fragment"
+ * comments and any preceding and trailing content.
  *
  * @param {string} html the html to be normalized
  * @return {string} the normalized html
  */
 function removeWindowsFragments( html ) {
-	const startReg = /.*<!--StartFragment-->/s;
-	const endReg = /<!--EndFragment-->.*/s;
+	const startStr = '<!--StartFragment-->';
+	const startIdx = html.indexOf( startStr );
+	if ( startIdx > -1 ) {
+		html = html.substring( startIdx + startStr.length );
+	} else {
+		// No point looking for EndFragment
+		return html;
+	}
 
-	return html.replace( startReg, '' ).replace( endReg, '' );
+	const endStr = '<!--EndFragment-->';
+	const endIdx = html.indexOf( endStr );
+	if ( endIdx > -1 ) {
+		html = html.substring( 0, endIdx );
+	}
+
+	return html;
 }
 
 /**

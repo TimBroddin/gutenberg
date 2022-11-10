@@ -15,6 +15,11 @@ import { registerBlockType } from '@wordpress/blocks';
 import { __ } from '@wordpress/i18n';
 import { DimensionControl } from '@wordpress/components';
 
+const partialRight =
+	( fn, ...partialArgs ) =>
+	( ...args ) =>
+		fn( ...args, ...partialArgs );
+
 registerBlockType( 'my-plugin/my-block', {
 	// ...
 

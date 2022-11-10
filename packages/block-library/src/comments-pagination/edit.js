@@ -7,6 +7,7 @@ import {
 	useBlockProps,
 	useInnerBlocksProps,
 	store as blockEditorStore,
+	Warning,
 } from '@wordpress/block-editor';
 import { useSelect } from '@wordpress/data';
 import { getBlockSupport } from '@wordpress/blocks';
@@ -17,8 +18,16 @@ import { PanelBody } from '@wordpress/components';
  */
 import { CommentsPaginationArrowControls } from './comments-pagination-arrow-controls';
 
-// TODO: add pagination-previous/next blocks once they are implemented.
-const TEMPLATE = [ [ 'core/comments-pagination-numbers' ] ];
+const TEMPLATE = [
+	[ 'core/comments-pagination-previous' ],
+	[ 'core/comments-pagination-numbers' ],
+	[ 'core/comments-pagination-next' ],
+];
+const ALLOWED_BLOCKS = [
+	'core/comments-pagination-previous',
+	'core/comments-pagination-numbers',
+	'core/comments-pagination-next',
+];
 
 const getDefaultBlockLayout = ( blockTypeOrName ) => {
 	const layoutBlockSupportConfig = getBlockSupport(
@@ -40,24 +49,44 @@ export default function QueryPaginationEdit( {
 		const innerBlocks = getBlocks( clientId );
 		/**
 		 * Show the `paginationArrow` control only if a
-		 * `QueryPaginationNext/Previous` block exists.
+		 * Comments Pagination Next or Comments Pagination Previous
+		 * block exists.
 		 */
 		return innerBlocks?.find( ( innerBlock ) => {
 			return [
-				'core/query-pagination-next',
-				'core/query-pagination-previous',
+				'core/comments-pagination-previous',
+				'core/comments-pagination-next',
 			].includes( innerBlock.name );
 		} );
 	}, [] );
+
 	const blockProps = useBlockProps();
 	const innerBlocksProps = useInnerBlocksProps( blockProps, {
 		template: TEMPLATE,
-		allowedBlocks: [
-			// TODO: add pagination-previous/next blocks once they are implemented.
-			'core/comments-pagination-numbers',
-		],
+		allowedBlocks: ALLOWED_BLOCKS,
 		__experimentalLayout: usedLayout,
 	} );
+
+	// Get the Discussion settings
+	const pageComments = useSelect( ( select ) => {
+		const { getSettings } = select( blockEditorStore );
+		const { __experimentalDiscussionSettings } = getSettings();
+		return __experimentalDiscussionSettings?.pageComments;
+	}, [] );
+
+	// If paging comments is not enabled in the Discussion Settings then hide the pagination
+	// controls. We don't want to remove them from the template so that when the user enables
+	// paging comments, the controls will be visible.
+	if ( ! pageComments ) {
+		return (
+			<Warning>
+				{ __(
+					'Comments Pagination block: paging comments is disabled in the Discussion Settings'
+				) }
+			</Warning>
+		);
+	}
+
 	return (
 		<>
 			{ hasNextPreviousBlocks && (

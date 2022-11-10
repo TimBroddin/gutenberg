@@ -7,13 +7,17 @@ node_modules
 gutenberg.zip
 coverage
 *-performance-results.json
+.phpunit.result.cache
 
 # Directories/files that may appear in your environment
 *.log
 yarn.lock
 /artifacts
+/perf-envs
+/composer.lock
 
 .cache
+.eslintcache
 *.tsbuildinfo
 
 # Operating system specific files
@@ -28,3 +32,6 @@ test/native/junit.xml
 phpcs.xml
 phpunit.xml
 phpunit-watcher.yml
+.tool-versions
+test/storybook-playwright/test-results
+test/storybook-playwright/specs/__snapshots__

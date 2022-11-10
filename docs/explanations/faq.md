@@ -28,7 +28,7 @@ What follows is a set of questions that have come up from the last few years of 
 
 ### The Development Experience
 - [How do I make my own block?](#how-do-i-make-my-own-block)
-- [Does Gutenberg involve editing posts/pages in the front-end?](#does-gutenberg-involve-editing-postspages-in-the-front-end)
+- [Does Gutenberg involve editing posts/pages in the front-end?](#does-gutenberg-involve-editing-posts-pages-in-the-front-end)
 - [Given Gutenberg is built in JavaScript, how do old meta boxes (PHP) work?](#given-gutenberg-is-built-in-javascript-how-do-old-meta-boxes-php-work)
 - [How can plugins extend the Gutenberg UI?](#how-can-plugins-extend-the-gutenberg-ui)
 - [Are Custom Post Types still supported?](#are-custom-post-types-still-supported)
@@ -192,7 +192,7 @@ This is the canonical list of keyboard shortcuts:
 		</tr>
 		<tr>
 			<td>Toggle fullscreen mode.</td>
-			<td><kbd>CMD</kbd>+<kbd>Option</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td>
+			<td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td>
 			<td><kbd>⇧</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>F</kbd></td>
 		</tr>
 	</tbody>

@@ -1,7 +1,6 @@
 /**
  * External dependencies
  */
-import { noop } from 'lodash';
 import classnames from 'classnames';
 
 /**
@@ -17,6 +16,7 @@ import warning from '@wordpress/warning';
  */
 import { Button } from '../';
 
+const noop = () => {};
 const NOTICE_TIMEOUT = 10000;
 
 /** @typedef {import('@wordpress/element').WPElement} WPElement */
@@ -93,13 +93,13 @@ function Snackbar(
 		}, NOTICE_TIMEOUT );
 
 		return () => clearTimeout( timeoutHandle );
-	}, [ onDismiss, onRemove ] );
+	}, [ onDismiss, onRemove, explicitDismiss ] );
 
 	const classes = classnames( className, 'components-snackbar', {
 		'components-snackbar-explicit-dismiss': !! explicitDismiss,
 	} );
 	if ( actions && actions.length > 1 ) {
-		// we need to inform developers that snackbar only accepts 1 action
+		// We need to inform developers that snackbar only accepts 1 action.
 		warning(
 			'Snackbar can only have 1 action, use Notice if your message require many messages'
 		);

@@ -3,7 +3,7 @@
  */
 const fs = require( 'fs' );
 const path = require( 'path' );
-const { mapValues } = require( 'lodash' );
+const { mapValues, kebabCase } = require( 'lodash' );
 
 /**
  * Internal dependencies
@@ -161,10 +161,7 @@ async function setUpGitBranch( branch, environmentDirectory ) {
 	await git.checkoutRemoteBranch( environmentDirectory, branch );
 
 	log( '        >> Building the ' + formats.success( branch ) + ' branch' );
-	await runShellScript(
-		'npm install && npm run build',
-		environmentDirectory
-	);
+	await runShellScript( 'npm ci && npm run build', environmentDirectory );
 }
 
 /**
@@ -177,7 +174,7 @@ async function setUpGitBranch( branch, environmentDirectory ) {
  */
 async function runTestSuite( testSuite, performanceTestDirectory ) {
 	await runShellScript(
-		`npm run test-performance -- packages/e2e-tests/specs/performance/${ testSuite }.test.js`,
+		`npm run test:performance -- packages/e2e-tests/specs/performance/${ testSuite }.test.js`,
 		performanceTestDirectory
 	);
 	const rawResults = await readJSONFile(
@@ -196,6 +193,8 @@ async function runTestSuite( testSuite, performanceTestDirectory ) {
  * @param {WPPerformanceCommandOptions} options  Command options.
  */
 async function runPerformanceTests( branches, options ) {
+	const runningInCI = !! process.env.CI || !! options.ci;
+
 	// The default value doesn't work because commander provides an array.
 	if ( branches.length === 0 ) {
 		branches = [ 'trunk' ];
@@ -204,19 +203,21 @@ async function runPerformanceTests( branches, options ) {
 	log(
 		formats.title( '\n💃 Performance Tests 🕺\n' ),
 		'\nWelcome! This tool runs the performance tests on multiple branches and displays a comparison table.\n' +
-			'In order to run the tests, the tool is going to load a WordPress environment on 8888 and 8889 ports.\n' +
+			'In order to run the tests, the tool is going to load a WordPress environment on ports 8888 and 8889.\n' +
 			'Make sure these ports are not used before continuing.\n'
 	);
 
-	if ( ! options.ci ) {
+	if ( ! runningInCI ) {
 		await askForConfirmation( 'Ready to go? ' );
 	}
 
 	// 1- Preparing the tests directory.
-	log( '\n>> Preparing the tests directory' );
+	log( '\n>> Preparing the tests directories' );
 	log( '    >> Cloning the repository' );
 	const baseDirectory = await git.clone( config.gitRepositoryURL );
-	const performanceTestDirectory = getRandomTemporaryPath();
+	const rootDirectory = getRandomTemporaryPath();
+	const performanceTestDirectory = rootDirectory + '/tests';
+	await runShellScript( 'mkdir -p ' + rootDirectory );
 	await runShellScript(
 		'cp -R ' + baseDirectory + ' ' + performanceTestDirectory
 	);
@@ -233,22 +234,36 @@ async function runPerformanceTests( branches, options ) {
 	}
 	log( '    >> Installing dependencies and building packages' );
 	await runShellScript(
-		'npm install && npm run build:packages',
+		'npm ci && npm run build:packages',
 		performanceTestDirectory
 	);
+	log( '    >> Creating the environment folders' );
+	await runShellScript( 'mkdir -p ' + rootDirectory + '/envs' );
 
 	// 2- Preparing the environment directories per branch.
 	log( '\n>> Preparing an environment directory per branch' );
 	const branchDirectories = {};
 	for ( const branch of branches ) {
 		log( '    >> Branch: ' + branch );
-		const environmentDirectory = getRandomTemporaryPath();
+		const environmentDirectory =
+			rootDirectory + '/envs/' + kebabCase( branch );
 		// @ts-ignore
 		branchDirectories[ branch ] = environmentDirectory;
+		await runShellScript( 'mkdir ' + environmentDirectory );
 		await runShellScript(
-			'cp -R ' + baseDirectory + ' ' + environmentDirectory
+			'cp -R ' + baseDirectory + ' ' + environmentDirectory + '/plugin'
 		);
-		await setUpGitBranch( branch, environmentDirectory );
+		await setUpGitBranch( branch, environmentDirectory + '/plugin' );
+		await runShellScript(
+			'cp ' +
+				path.resolve(
+					performanceTestDirectory,
+					'bin/plugin/utils/.wp-env.performance.json'
+				) +
+				' ' +
+				environmentDirectory +
+				'/.wp-env.json'
+		);
 
 		if ( options.wpVersion ) {
 			// In order to match the topology of ZIP files at wp.org, remap .0
@@ -307,7 +322,7 @@ async function runPerformanceTests( branches, options ) {
 		results[ testSuite ] = {};
 		/** @type {Array<Record<string, WPPerformanceResults>>} */
 		const rawResults = [];
-		// Alternate three times between branches
+		// Alternate three times between branches.
 		for ( let i = 0; i < 3; i++ ) {
 			rawResults[ i ] = {};
 			for ( const branch of branches ) {
@@ -316,7 +331,7 @@ async function runPerformanceTests( branches, options ) {
 				log( '    >> Branch: ' + branch + ', Suite: ' + testSuite );
 				log( '        >> Starting the environment.' );
 				await runShellScript(
-					'npm run wp-env start',
+					'../../tests/node_modules/.bin/wp-env start',
 					environmentDirectory
 				);
 				log( '        >> Running the test.' );
@@ -326,7 +341,7 @@ async function runPerformanceTests( branches, options ) {
 				);
 				log( '        >> Stopping the environment' );
 				await runShellScript(
-					'npm run wp-env stop',
+					'../../tests/node_modules/.bin/wp-env stop',
 					environmentDirectory
 				);
 			}

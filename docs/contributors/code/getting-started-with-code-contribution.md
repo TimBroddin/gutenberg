@@ -16,7 +16,7 @@ We recommend using the [Node Version Manager](https://github.com/nvm-sh/nvm) (nv
     We recommend using the [wp-env package](/packages/env/README.md) for setting WordPress environment locally. You'll need to install Docker to use `wp-env`. See the [Development Environment tutorial for additional details](/docs/getting-started/devenv/README.md).
     > Note: To install Docker on Windows 10 Home Edition, follow the [install instructions from Docker for Windows with WSL2](https://docs.docker.com/docker-for-windows/wsl/).
 
-As an alternative to Docker setup, you can use [Local by Flywheel](https://localbyflywheel.com/), [WampServer](http://www.wampserver.com/en/), or [MAMP](https://www.mamp.info/), or even use a remote server.
+As an alternative to Docker setup, you can use [Local](https://localwp.com/), [WampServer](http://www.wampserver.com/en/), or [MAMP](https://www.mamp.info/), or even use a remote server.
 
 ## Getting the Gutenberg code
 
@@ -71,7 +71,7 @@ To stop the running environment:
 npm run wp-env stop
 ```
 
-If everyting went well, you should see the following message in your terminal:
+If everything went well, you should see the following message in your terminal:
 
 ```bash
 WordPress development site started at http://localhost:8888/
@@ -116,6 +116,7 @@ To access the MySQL database on the `wp-env` instance you will first need the co
 ```
 Host: 127.0.0.1
 Username: root
+Password: password
 Database: wordpress
 Port: {MYSQL_PORT_NUMBER}
 ```
@@ -130,7 +131,7 @@ If you run into an issue, check the [troubleshooting section in `wp-env` documen
 
 ### Using Local or MAMP
 
-As an alternative to Docker and `wp-env`, you can also use [Local by Flywheel](https://localbyflywheel.com/), [WampServer](http://www.wampserver.com/en/), or [MAMP](https://www.mamp.info/) to run a local WordPress environment. To do so clone and install Gutenberg as a regular plugin in your installation by creating a symlink or copying the directory to the proper `wp-content/plugins` directory.
+As an alternative to Docker and `wp-env`, you can also use [Local](https://localwp.com/), [WampServer](http://www.wampserver.com/en/), or [MAMP](https://www.mamp.info/) to run a local WordPress environment. To do so clone and install Gutenberg as a regular plugin in your installation by creating a symlink or copying the directory to the proper `wp-content/plugins` directory.
 
 You will also need some extra configuration to be able to run the e2e tests.
 
@@ -143,7 +144,7 @@ ln -s gutenberg/packages/e2e-tests/plugins/* .
 You'll need to run this again if new plugins are added. To run e2e tests:
 
 ```bash
-WP_BASE_URL=http://localhost:8888/gutenberg npm run test-e2e
+WP_BASE_URL=http://localhost:8888/gutenberg/ npm run test:e2e
 ```
 
 #### Caching of PHP files

@@ -2,8 +2,8 @@
  * WordPress dependencies
  */
 import { __ } from '@wordpress/i18n';
-import { __experimentalPanelColorGradientSettings as PanelColorGradientSettings } from '@wordpress/block-editor';
-
+import { __experimentalColorGradientControl as ColorGradientControl } from '@wordpress/block-editor';
+import { TabPanel } from '@wordpress/components';
 /**
  * Internal dependencies
  */
@@ -16,7 +16,6 @@ import {
 } from './hooks';
 
 function ScreenLinkColor( { name } ) {
-	const parentMenu = name === undefined ? '' : '/blocks/' + name;
 	const supports = getSupportedGlobalStylesPanels( name );
 	const [ solids ] = useSetting( 'color.palette', name );
 	const [ areCustomSolidsEnabled ] = useSetting( 'color.custom', name );
@@ -30,49 +29,82 @@ function ScreenLinkColor( { name } ) {
 		isLinkEnabled &&
 		( solids.length > 0 || areCustomSolidsEnabled );
 
-	const [ linkColor, setLinkColor ] = useStyle(
-		'elements.link.color.text',
-		name
-	);
-	const [ userLinkColor ] = useStyle(
-		'elements.link.color.text',
-		name,
-		'user'
-	);
+	const pseudoStates = {
+		default: {
+			label: __( 'Default' ),
+			value: useStyle( 'elements.link.color.text', name )[ 0 ],
+			handler: useStyle( 'elements.link.color.text', name )[ 1 ],
+			userValue: useStyle(
+				'elements.link.color.text',
+				name,
+				'user'
+			)[ 0 ],
+		},
+		hover: {
+			label: __( 'Hover' ),
+			value: useStyle( 'elements.link.:hover.color.text', name )[ 0 ],
+			handler: useStyle( 'elements.link.:hover.color.text', name )[ 1 ],
+			userValue: useStyle(
+				'elements.link.:hover.color.text',
+				name,
+				'user'
+			)[ 0 ],
+		},
+	};
 
 	if ( ! hasLinkColor ) {
 		return null;
 	}
 
-	const settings = [
-		{
-			colorValue: linkColor,
-			onColorChange: setLinkColor,
-			label: __( 'Link color' ),
-			clearable: linkColor === userLinkColor,
-		},
-	];
+	const tabs = Object.entries( pseudoStates ).map(
+		( [ selector, config ] ) => {
+			return {
+				name: selector,
+				title: config.label,
+				className: `color-text-${ selector }`,
+			};
+		}
+	);
 
 	return (
 		<>
 			<ScreenHeader
-				back={ parentMenu + '/colors' }
 				title={ __( 'Links' ) }
 				description={ __(
-					'Set the default color used for links across the site.'
+					'Set the colors used for links across the site.'
 				) }
 			/>
 
-			<PanelColorGradientSettings
-				title={ __( 'Color' ) }
-				settings={ settings }
-				colors={ colorsPerOrigin }
-				disableCustomColors={ ! areCustomSolidsEnabled }
-				__experimentalHasMultipleOrigins
-				showTitle={ false }
-				enableAlpha
-				__experimentalIsRenderedInSidebar
-			/>
+			<TabPanel tabs={ tabs }>
+				{ ( tab ) => {
+					const pseudoSelectorConfig =
+						pseudoStates[ tab.name ] ?? null;
+
+					if ( ! pseudoSelectorConfig ) {
+						return null;
+					}
+
+					return (
+						<>
+							<ColorGradientControl
+								className="edit-site-screen-link-color__control"
+								colors={ colorsPerOrigin }
+								disableCustomColors={ ! areCustomSolidsEnabled }
+								__experimentalHasMultipleOrigins
+								showTitle={ false }
+								enableAlpha
+								__experimentalIsRenderedInSidebar
+								colorValue={ pseudoSelectorConfig.value }
+								onColorChange={ pseudoSelectorConfig.handler }
+								clearable={
+									pseudoSelectorConfig.value ===
+									pseudoSelectorConfig.userValue
+								}
+							/>
+						</>
+					);
+				} }
+			</TabPanel>
 		</>
 	);
 }

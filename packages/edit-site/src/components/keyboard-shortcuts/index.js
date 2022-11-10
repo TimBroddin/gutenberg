@@ -15,14 +15,13 @@ import { store as interfaceStore } from '@wordpress/interface';
  * Internal dependencies
  */
 import { store as editSiteStore } from '../../store';
-import { SIDEBAR_BLOCK } from '../sidebar/constants';
+import { SIDEBAR_BLOCK } from '../sidebar-edit-mode/constants';
 import { STORE_NAME } from '../../store/constants';
 
-function KeyboardShortcuts( { openEntitiesSavedStates } ) {
-	const {
-		__experimentalGetDirtyEntityRecords,
-		isSavingEntityRecord,
-	} = useSelect( coreStore );
+function KeyboardShortcuts() {
+	const { __experimentalGetDirtyEntityRecords, isSavingEntityRecord } =
+		useSelect( coreStore );
+	const { getEditorMode } = useSelect( editSiteStore );
 	const isListViewOpen = useSelect(
 		( select ) => select( editSiteStore ).isListViewOpened(),
 		[]
@@ -35,10 +34,11 @@ function KeyboardShortcuts( { openEntitiesSavedStates } ) {
 		[]
 	);
 	const { redo, undo } = useDispatch( coreStore );
-	const { setIsListViewOpened } = useDispatch( editSiteStore );
-	const { enableComplementaryArea, disableComplementaryArea } = useDispatch(
-		interfaceStore
-	);
+	const { setIsListViewOpened, switchEditorMode } =
+		useDispatch( editSiteStore );
+	const { enableComplementaryArea, disableComplementaryArea } =
+		useDispatch( interfaceStore );
+	const { setIsSaveViewOpened } = useDispatch( editSiteStore );
 
 	useShortcut( 'core/edit-site/save', ( event ) => {
 		event.preventDefault();
@@ -50,7 +50,7 @@ function KeyboardShortcuts( { openEntitiesSavedStates } ) {
 		);
 
 		if ( ! isSaving && isDirty ) {
-			openEntitiesSavedStates();
+			setIsSaveViewOpened( true );
 		}
 	} );
 
@@ -80,11 +80,15 @@ function KeyboardShortcuts( { openEntitiesSavedStates } ) {
 		}
 	} );
 
+	useShortcut( 'core/edit-site/toggle-mode', () => {
+		switchEditorMode( getEditorMode() === 'visual' ? 'text' : 'visual' );
+	} );
+
 	return null;
 }
 
 function KeyboardShortcutsRegister() {
-	// Registering the shortcuts
+	// Registering the shortcuts.
 	const { registerShortcut } = useDispatch( keyboardShortcutsStore );
 	useEffect( () => {
 		registerShortcut( {
@@ -138,6 +142,16 @@ function KeyboardShortcutsRegister() {
 		} );
 
 		registerShortcut( {
+			name: 'core/edit-site/keyboard-shortcuts',
+			category: 'main',
+			description: __( 'Display these keyboard shortcuts.' ),
+			keyCombination: {
+				modifier: 'access',
+				character: 'h',
+			},
+		} );
+
+		registerShortcut( {
 			name: 'core/edit-site/next-region',
 			category: 'global',
 			description: __( 'Navigate to the next part of the editor.' ),
@@ -167,6 +181,15 @@ function KeyboardShortcutsRegister() {
 					character: 'p',
 				},
 			],
+		} );
+		registerShortcut( {
+			name: 'core/edit-site/toggle-mode',
+			category: 'global',
+			description: __( 'Switch between visual editor and code editor.' ),
+			keyCombination: {
+				modifier: 'secondary',
+				character: 'm',
+			},
 		} );
 	}, [ registerShortcut ] );
 

@@ -7,7 +7,6 @@ import {
 	createNewPost,
 	pressKeyWithModifier,
 	pressKeyTimes,
-	activateTheme,
 	openTypographyToolsPanelMenu,
 } from '@wordpress/e2e-test-utils';
 
@@ -38,9 +37,7 @@ const toggleCustomInput = async ( showCustomInput ) => {
 };
 
 const clickCustomInput = async () => {
-	const customInput = await page.waitForXPath(
-		"//input[@aria-label='Custom']"
-	);
+	const customInput = await page.waitForXPath( "//input[@type='number']" );
 	return customInput.click();
 };
 
@@ -100,21 +97,68 @@ describe( 'Font Size Picker', () => {
 		` );
 		} );
 	} );
+
 	// A different control is rendered based on the available font sizes number.
 	describe( 'More font sizes', () => {
-		beforeAll( async () => {
-			await activateTheme( 'tt1-blocks' );
+		beforeEach( async () => {
+			await page.evaluate( () => {
+				wp.data.dispatch( 'core/block-editor' ).updateSettings(
+					// eslint-disable-next-line no-undef
+					lodash.merge(
+						wp.data.select( 'core/block-editor' ).getSettings(),
+						{
+							__experimentalFeatures: {
+								typography: {
+									fontSizes: {
+										default: [
+											{
+												name: 'Tiny',
+												slug: 'tiny',
+												size: '11px',
+											},
+											,
+											{
+												name: 'Small',
+												slug: 'small',
+												size: '13px',
+											},
+											{
+												name: 'Medium',
+												slug: 'medium',
+												size: '20px',
+											},
+											{
+												name: 'Large',
+												slug: 'large',
+												size: '36px',
+											},
+											{
+												name: 'Extra Large',
+												slug: 'x-large',
+												size: '42px',
+											},
+											{
+												name: 'Huge',
+												slug: 'huge',
+												size: '48px',
+											},
+										],
+									},
+								},
+							},
+						}
+					)
+				);
+			} );
 		} );
-		afterAll( async () => {
-			await activateTheme( 'twentytwentyone' );
-		} );
+
 		it( 'should apply a named font size using the font size buttons', async () => {
 			// Create a paragraph block with some content.
 			await clickBlockAppender();
 			await page.keyboard.type( 'Paragraph to be made "large"' );
 
 			await openFontSizeSelectControl();
-			await pressKeyTimes( 'ArrowDown', 4 );
+			await pressKeyTimes( 'ArrowDown', 5 );
 			await page.keyboard.press( 'Enter' );
 
 			expect( await getEditedPostContent() ).toMatchInlineSnapshot( `
@@ -131,11 +175,11 @@ describe( 'Font Size Picker', () => {
 			);
 
 			await openFontSizeSelectControl();
-			await pressKeyTimes( 'ArrowDown', 3 );
+			await pressKeyTimes( 'ArrowDown', 4 );
 			await page.keyboard.press( 'Enter' );
 			expect( await getEditedPostContent() ).toMatchInlineSnapshot( `
-			"<!-- wp:paragraph {\\"fontSize\\":\\"normal\\"} -->
-			<p class=\\"has-normal-font-size\\">Paragraph with font size reset using tools panel menu</p>
+			"<!-- wp:paragraph {\\"fontSize\\":\\"medium\\"} -->
+			<p class=\\"has-medium-font-size\\">Paragraph with font size reset using tools panel menu</p>
 			<!-- /wp:paragraph -->"
 		` );
 
@@ -158,7 +202,7 @@ describe( 'Font Size Picker', () => {
 			);
 
 			await openFontSizeSelectControl();
-			await pressKeyTimes( 'ArrowDown', 2 );
+			await pressKeyTimes( 'ArrowDown', 3 );
 			await page.keyboard.press( 'Enter' );
 			expect( await getEditedPostContent() ).toMatchInlineSnapshot( `
 			"<!-- wp:paragraph {\\"fontSize\\":\\"small\\"} -->
@@ -189,7 +233,7 @@ describe( 'Font Size Picker', () => {
 			await page.keyboard.type( 'Paragraph to be made "large"' );
 
 			await clickFontSizeButtonByLabel( 'Large' );
-			const buttonSelector = `${ FONT_SIZE_TOGGLE_GROUP_SELECTOR }//div[@data-active='true']//button`;
+			const buttonSelector = `${ FONT_SIZE_TOGGLE_GROUP_SELECTOR }//button[@aria-checked='true']`;
 			const [ activeButton ] = await page.$x( buttonSelector );
 			const activeLabel = await page.evaluate(
 				( element ) => element?.getAttribute( 'aria-label' ),

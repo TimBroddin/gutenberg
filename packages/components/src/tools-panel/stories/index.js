@@ -29,11 +29,13 @@ export const _default = () => {
 	const [ height, setHeight ] = useState();
 	const [ minHeight, setMinHeight ] = useState();
 	const [ width, setWidth ] = useState();
+	const [ scale, setScale ] = useState();
 
 	const resetAll = () => {
 		setHeight( undefined );
 		setWidth( undefined );
 		setMinHeight( undefined );
+		setScale( undefined );
 	};
 
 	return (
@@ -78,6 +80,31 @@ export const _default = () => {
 							value={ minHeight }
 							onChange={ ( next ) => setMinHeight( next ) }
 						/>
+					</ToolsPanelItem>
+					<ToolsPanelItem
+						hasValue={ () => !! scale }
+						label="Scale"
+						onDeselect={ () => setScale( undefined ) }
+					>
+						<ToggleGroupControl
+							label="Scale"
+							value={ scale }
+							onChange={ ( next ) => setScale( next ) }
+							isBlock
+						>
+							<ToggleGroupControlOption
+								value="cover"
+								label="Cover"
+							/>
+							<ToggleGroupControlOption
+								value="contain"
+								label="Contain"
+							/>
+							<ToggleGroupControlOption
+								value="fill"
+								label="Fill"
+							/>
+						</ToggleGroupControl>
 					</ToolsPanelItem>
 				</ToolsPanel>
 			</Panel>
@@ -135,13 +162,15 @@ export const WithNonToolsPanelItems = () => {
 	);
 };
 
-export const WithOptionalItemsPlusIcon = () => {
+export const WithOptionalItemsPlusIcon = ( { isShownByDefault } ) => {
 	const [ height, setHeight ] = useState();
 	const [ width, setWidth ] = useState();
+	const [ minWidth, setMinWidth ] = useState();
 
 	const resetAll = () => {
 		setHeight( undefined );
 		setWidth( undefined );
+		setMinWidth( undefined );
 	};
 
 	return (
@@ -150,7 +179,20 @@ export const WithOptionalItemsPlusIcon = () => {
 				<ToolsPanel
 					label="Tools Panel (optional items only)"
 					resetAll={ resetAll }
+					key={ isShownByDefault }
 				>
+					<SingleColumnItem
+						hasValue={ () => !! minWidth }
+						label="Minimum width"
+						onDeselect={ () => setMinWidth( undefined ) }
+						isShownByDefault={ isShownByDefault }
+					>
+						<UnitControl
+							label="Minimum width"
+							value={ minWidth }
+							onChange={ ( next ) => setMinWidth( next ) }
+						/>
+					</SingleColumnItem>
 					<SingleColumnItem
 						hasValue={ () => !! width }
 						label="Width"
@@ -179,6 +221,10 @@ export const WithOptionalItemsPlusIcon = () => {
 			</Panel>
 		</PanelWrapperView>
 	);
+};
+
+WithOptionalItemsPlusIcon.args = {
+	isShownByDefault: false,
 };
 
 const { Fill: ToolsPanelItems, Slot } = createSlotFill( 'ToolsPanelSlot' );
@@ -448,10 +494,9 @@ export const WithConditionallyRenderedControl = () => {
 	);
 };
 
-export { TypographyPanel } from './typography-panel';
+export { ToolsPanelWithItemGroupSlot } from './tools-panel-with-item-group-slot';
 
 const PanelWrapperView = styled.div`
-	max-width: 280px;
 	font-size: 13px;
 
 	.components-dropdown-menu__menu {

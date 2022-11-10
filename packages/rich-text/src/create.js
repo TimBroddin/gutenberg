@@ -64,9 +64,8 @@ function toFormat( { type, attributes } ) {
 	}
 
 	if ( ! formatType ) {
-		formatType = select( richTextStore ).getFormatTypeForBareElement(
-			type
-		);
+		formatType =
+			select( richTextStore ).getFormatTypeForBareElement( type );
 	}
 
 	if ( ! formatType ) {
@@ -94,12 +93,11 @@ function toFormat( { type, attributes } ) {
 		registeredAttributes[ key ] = _attributes[ name ];
 
 		if ( formatType.__unstableFilterAttributeValue ) {
-			registeredAttributes[
-				key
-			] = formatType.__unstableFilterAttributeValue(
-				key,
-				registeredAttributes[ key ]
-			);
+			registeredAttributes[ key ] =
+				formatType.__unstableFilterAttributeValue(
+					key,
+					registeredAttributes[ key ]
+				);
 		}
 
 		// delete the attribute and what's left is considered
@@ -321,7 +319,7 @@ function collapseWhiteSpace( string ) {
  * @param {string} string
  */
 export function removeReservedCharacters( string ) {
-	//with the global flag, note that we should create a new regex each time OR reset lastIndex state.
+	// with the global flag, note that we should create a new regex each time OR reset lastIndex state.
 	return string.replace(
 		new RegExp( `[${ ZWNBSP }${ OBJECT_REPLACEMENT_CHARACTER }]`, 'gu' ),
 		''

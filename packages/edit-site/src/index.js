@@ -13,17 +13,21 @@ import {
 	__experimentalFetchUrlData as fetchUrlData,
 } from '@wordpress/core-data';
 import { store as editorStore } from '@wordpress/editor';
+import { store as interfaceStore } from '@wordpress/interface';
+import { store as preferencesStore } from '@wordpress/preferences';
+import { __ } from '@wordpress/i18n';
 import { store as viewportStore } from '@wordpress/viewport';
 import { getQueryArgs } from '@wordpress/url';
+import { addFilter } from '@wordpress/hooks';
 
 /**
  * Internal dependencies
  */
-import './plugins';
 import './hooks';
 import { store as editSiteStore } from './store';
 import EditSiteApp from './components/app';
 import getIsListPage from './utils/get-is-list-page';
+import ErrorBoundaryWarning from './components/error-boundary/warning';
 
 /**
  * Reinitializes the editor after the user chooses to reboot the editor after
@@ -34,6 +38,42 @@ import getIsListPage from './utils/get-is-list-page';
  * @param {?Object} settings Editor settings object.
  */
 export function reinitializeEditor( target, settings ) {
+	// Display warning if editor wasn't able to resolve homepage template.
+	if ( ! settings.__unstableHomeTemplate ) {
+		render(
+			<ErrorBoundaryWarning
+				message={ __(
+					'The editor is unable to find a block template for the homepage.'
+				) }
+				dashboardLink={
+					settings.__experimentalDashboardLink ?? 'index.php'
+				}
+			/>,
+			target
+		);
+		return;
+	}
+
+	/*
+	 * Prevent adding the Clasic block in the site editor.
+	 * Only add the filter when the site editor is initialized, not imported.
+	 * Also only add the filter(s) after registerCoreBlocks()
+	 * so that common filters in the block library are not overwritten.
+	 *
+	 * This usage here is inspired by previous usage of the filter in the post editor:
+	 * https://github.com/WordPress/gutenberg/pull/37157
+	 */
+	addFilter(
+		'blockEditor.__unstableCanInsertBlockType',
+		'removeClassicBlockFromInserter',
+		( canInsert, blockType ) => {
+			if ( blockType.name === 'core/freeform' ) {
+				return false;
+			}
+			return canInsert;
+		}
+	);
+
 	// This will be a no-op if the target doesn't have any React nodes.
 	unmountComponentAtNode( target );
 	const reboot = reinitializeEditor.bind( null, target, settings );
@@ -41,7 +81,33 @@ export function reinitializeEditor( target, settings ) {
 	// We dispatch actions and update the store synchronously before rendering
 	// so that we won't trigger unnecessary re-renders with useEffect.
 	{
+		dispatch( preferencesStore ).setDefaults( 'core/edit-site', {
+			editorMode: 'visual',
+			fixedToolbar: false,
+			focusMode: false,
+			keepCaretInsideBlock: false,
+			welcomeGuide: true,
+			welcomeGuideStyles: true,
+			showListViewByDefault: false,
+		} );
+
+		// Check if the block list view should be open by default.
+		if (
+			select( preferencesStore ).get(
+				'core/edit-site',
+				'showListViewByDefault'
+			)
+		) {
+			dispatch( editSiteStore ).setIsListViewOpened( true );
+		}
+
+		dispatch( interfaceStore ).setDefaultComplementaryArea(
+			'core/edit-site',
+			'edit-site/template'
+		);
+
 		dispatch( editSiteStore ).updateSettings( settings );
+
 		// Keep the defaultTemplateTypes in the core/editor settings too,
 		// so that they can be selected with core/editor selectors in any editor.
 		// This is needed because edit-site doesn't initialize with EditorProvider,
@@ -64,7 +130,17 @@ export function reinitializeEditor( target, settings ) {
 		}
 	}
 
-	render( <EditSiteApp reboot={ reboot } />, target );
+	// Prevent the default browser action for files dropped outside of dropzones.
+	window.addEventListener( 'dragover', ( e ) => e.preventDefault(), false );
+	window.addEventListener( 'drop', ( e ) => e.preventDefault(), false );
+
+	render(
+		<EditSiteApp
+			reboot={ reboot }
+			homeTemplate={ settings.__unstableHomeTemplate }
+		/>,
+		target
+	);
 }
 
 /**
@@ -77,13 +153,12 @@ export function initializeEditor( id, settings ) {
 	settings.__experimentalFetchLinkSuggestions = ( search, searchOptions ) =>
 		fetchLinkSuggestions( search, searchOptions, settings );
 	settings.__experimentalFetchRichUrlData = fetchUrlData;
-	settings.__experimentalSpotlightEntityBlocks = [ 'core/template-part' ];
 
 	const target = document.getElementById( id );
 
 	dispatch( blocksStore ).__experimentalReapplyBlockTypeFilters();
 	registerCoreBlocks();
-	if ( process.env.GUTENBERG_PHASE === 2 ) {
+	if ( process.env.IS_GUTENBERG_PLUGIN ) {
 		__experimentalRegisterExperimentalCoreBlocks( {
 			enableFSEBlocks: true,
 		} );
@@ -92,8 +167,7 @@ export function initializeEditor( id, settings ) {
 	reinitializeEditor( target, settings );
 }
 
-export { default as __experimentalMainDashboardButton } from './components/main-dashboard-button';
 export { default as __experimentalNavigationToggle } from './components/navigation-sidebar/navigation-toggle';
-export { default as PluginSidebar } from './components/sidebar/plugin-sidebar';
-export { default as PluginSidebarMoreMenuItem } from './components/header/plugin-sidebar-more-menu-item';
-export { default as PluginMoreMenuItem } from './components/header/plugin-more-menu-item';
+export { default as PluginSidebar } from './components/sidebar-edit-mode/plugin-sidebar';
+export { default as PluginSidebarMoreMenuItem } from './components/header-edit-mode/plugin-sidebar-more-menu-item';
+export { default as PluginMoreMenuItem } from './components/header-edit-mode/plugin-more-menu-item';

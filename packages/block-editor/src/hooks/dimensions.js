@@ -1,8 +1,13 @@
 /**
+ * External dependencies
+ */
+import classnames from 'classnames';
+
+/**
  * WordPress dependencies
  */
 import { __experimentalToolsPanelItem as ToolsPanelItem } from '@wordpress/components';
-import { Platform } from '@wordpress/element';
+import { Platform, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { getBlockSupport } from '@wordpress/blocks';
 
@@ -19,6 +24,7 @@ import {
 } from './gap';
 import {
 	MarginEdit,
+	MarginVisualizer,
 	hasMarginSupport,
 	hasMarginValue,
 	resetMargin,
@@ -26,15 +32,24 @@ import {
 } from './margin';
 import {
 	PaddingEdit,
+	PaddingVisualizer,
 	hasPaddingSupport,
 	hasPaddingValue,
 	resetPadding,
 	useIsPaddingDisabled,
 } from './padding';
+import useSetting from '../components/use-setting';
 
 export const SPACING_SUPPORT_KEY = 'spacing';
 export const ALL_SIDES = [ 'top', 'right', 'bottom', 'left' ];
 export const AXIAL_SIDES = [ 'vertical', 'horizontal' ];
+
+function useVisualizerMouseOver() {
+	const [ isMouseOver, setIsMouseOver ] = useState( false );
+	const onMouseOver = () => setIsMouseOver( true );
+	const onMouseOut = () => setIsMouseOver( false );
+	return { isMouseOver, onMouseOver, onMouseOut };
+}
 
 /**
  * Inspector controls for dimensions support.
@@ -49,6 +64,9 @@ export function DimensionsPanel( props ) {
 	const isMarginDisabled = useIsMarginDisabled( props );
 	const isDisabled = useIsDimensionsDisabled( props );
 	const isSupported = hasDimensionsSupport( props.name );
+	const spacingSizes = useSetting( 'spacing.spacingSizes' );
+	const paddingMouseOver = useVisualizerMouseOver();
+	const marginMouseOver = useVisualizerMouseOver();
 
 	if ( isDisabled || ! isSupported ) {
 		return null;
@@ -70,45 +88,74 @@ export function DimensionsPanel( props ) {
 		},
 	} );
 
+	const spacingClassnames = classnames( {
+		'tools-panel-item-spacing': spacingSizes && spacingSizes.length > 0,
+	} );
+
 	return (
-		<InspectorControls __experimentalGroup="dimensions">
+		<>
+			<InspectorControls __experimentalGroup="dimensions">
+				{ ! isPaddingDisabled && (
+					<ToolsPanelItem
+						className={ spacingClassnames }
+						hasValue={ () => hasPaddingValue( props ) }
+						label={ __( 'Padding' ) }
+						onDeselect={ () => resetPadding( props ) }
+						resetAllFilter={ createResetAllFilter( 'padding' ) }
+						isShownByDefault={ defaultSpacingControls?.padding }
+						panelId={ props.clientId }
+					>
+						<PaddingEdit
+							onMouseOver={ paddingMouseOver.onMouseOver }
+							onMouseOut={ paddingMouseOver.onMouseOut }
+							{ ...props }
+						/>
+					</ToolsPanelItem>
+				) }
+				{ ! isMarginDisabled && (
+					<ToolsPanelItem
+						className={ spacingClassnames }
+						hasValue={ () => hasMarginValue( props ) }
+						label={ __( 'Margin' ) }
+						onDeselect={ () => resetMargin( props ) }
+						resetAllFilter={ createResetAllFilter( 'margin' ) }
+						isShownByDefault={ defaultSpacingControls?.margin }
+						panelId={ props.clientId }
+					>
+						<MarginEdit
+							onMouseOver={ marginMouseOver.onMouseOver }
+							onMouseOut={ marginMouseOver.onMouseOut }
+							{ ...props }
+						/>
+					</ToolsPanelItem>
+				) }
+				{ ! isGapDisabled && (
+					<ToolsPanelItem
+						className={ spacingClassnames }
+						hasValue={ () => hasGapValue( props ) }
+						label={ __( 'Block spacing' ) }
+						onDeselect={ () => resetGap( props ) }
+						resetAllFilter={ createResetAllFilter( 'blockGap' ) }
+						isShownByDefault={ defaultSpacingControls?.blockGap }
+						panelId={ props.clientId }
+					>
+						<GapEdit { ...props } />
+					</ToolsPanelItem>
+				) }
+			</InspectorControls>
 			{ ! isPaddingDisabled && (
-				<ToolsPanelItem
-					hasValue={ () => hasPaddingValue( props ) }
-					label={ __( 'Padding' ) }
-					onDeselect={ () => resetPadding( props ) }
-					resetAllFilter={ createResetAllFilter( 'padding' ) }
-					isShownByDefault={ defaultSpacingControls?.padding }
-					panelId={ props.clientId }
-				>
-					<PaddingEdit { ...props } />
-				</ToolsPanelItem>
+				<PaddingVisualizer
+					forceShow={ paddingMouseOver.isMouseOver }
+					{ ...props }
+				/>
 			) }
 			{ ! isMarginDisabled && (
-				<ToolsPanelItem
-					hasValue={ () => hasMarginValue( props ) }
-					label={ __( 'Margin' ) }
-					onDeselect={ () => resetMargin( props ) }
-					resetAllFilter={ createResetAllFilter( 'margin' ) }
-					isShownByDefault={ defaultSpacingControls?.margin }
-					panelId={ props.clientId }
-				>
-					<MarginEdit { ...props } />
-				</ToolsPanelItem>
+				<MarginVisualizer
+					forceShow={ marginMouseOver.isMouseOver }
+					{ ...props }
+				/>
 			) }
-			{ ! isGapDisabled && (
-				<ToolsPanelItem
-					hasValue={ () => hasGapValue( props ) }
-					label={ __( 'Block spacing' ) }
-					onDeselect={ () => resetGap( props ) }
-					resetAllFilter={ createResetAllFilter( 'blockGap' ) }
-					isShownByDefault={ defaultSpacingControls?.blockGap }
-					panelId={ props.clientId }
-				>
-					<GapEdit { ...props } />
-				</ToolsPanelItem>
-			) }
-		</InspectorControls>
+		</>
 	);
 }
 
@@ -147,7 +194,7 @@ const useIsDimensionsDisabled = ( props = {} ) => {
 };
 
 /**
- * Custom hook to retrieve which padding/margin is supported
+ * Custom hook to retrieve which padding/margin/blockGap is supported
  * e.g. top, right, bottom or left.
  *
  * Sides are opted into by default. It is only if a specific side is set to
@@ -156,7 +203,7 @@ const useIsDimensionsDisabled = ( props = {} ) => {
  * @param {string} blockName Block name.
  * @param {string} feature   The feature custom sides relate to e.g. padding or margins.
  *
- * @return {Object} Sides supporting custom margin.
+ * @return {?string[]} Strings representing the custom sides available.
  */
 export function useCustomSides( blockName, feature ) {
 	const support = getBlockSupport( blockName, SPACING_SUPPORT_KEY );
@@ -166,7 +213,15 @@ export function useCustomSides( blockName, feature ) {
 		return;
 	}
 
-	return support[ feature ];
+	// Return if the setting is an array of sides (e.g. `[ 'top', 'bottom' ]`).
+	if ( Array.isArray( support[ feature ] ) ) {
+		return support[ feature ];
+	}
+
+	// Finally, attempt to return `.sides` if the setting is an object.
+	if ( support[ feature ]?.sides ) {
+		return support[ feature ].sides;
+	}
 }
 
 /**

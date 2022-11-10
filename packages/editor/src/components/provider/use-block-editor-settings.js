@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { pick, defaultTo } from 'lodash';
+import { pick } from 'lodash';
 
 /**
  * WordPress dependencies
@@ -35,18 +35,17 @@ function useBlockEditorSettings( settings, hasTemplate ) {
 		hasUploadPermissions,
 		canUseUnfilteredHTML,
 		userCanCreatePages,
+		pageOnFront,
+		postType,
 	} = useSelect( ( select ) => {
-		const { canUserUseUnfilteredHTML } = select( editorStore );
+		const { canUserUseUnfilteredHTML, getCurrentPostType } =
+			select( editorStore );
 		const isWeb = Platform.OS === 'web';
-		const { canUser, getUnstableBase, hasFinishedResolution } = select(
-			coreStore
-		);
+		const { canUser, getEntityRecord } = select( coreStore );
 
-		const siteData = getUnstableBase();
-
-		const hasFinishedResolvingSiteData = hasFinishedResolution(
-			'getUnstableBase'
-		);
+		const siteSettings = canUser( 'read', 'settings' )
+			? getEntityRecord( 'root', 'site' )
+			: undefined;
 
 		return {
 			canUseUnfilteredHTML: canUserUseUnfilteredHTML(),
@@ -57,15 +56,60 @@ function useBlockEditorSettings( settings, hasTemplate ) {
 						{ per_page: -1 }
 				  )
 				: [], // Reusable blocks are fetched in the native version of this hook.
-			hasUploadPermissions: defaultTo(
-				canUser( 'create', 'media' ),
-				true
-			),
-			hasResolvedLocalSiteData: hasFinishedResolvingSiteData,
-			baseUrl: siteData?.url || '',
+			hasUploadPermissions: canUser( 'create', 'media' ) ?? true,
 			userCanCreatePages: canUser( 'create', 'pages' ),
+			pageOnFront: siteSettings?.page_on_front,
+			postType: getCurrentPostType(),
 		};
 	}, [] );
+
+	const settingsBlockPatterns =
+		settings.__experimentalAdditionalBlockPatterns ?? // WP 6.0
+		settings.__experimentalBlockPatterns; // WP 5.9
+	const settingsBlockPatternCategories =
+		settings.__experimentalAdditionalBlockPatternCategories ?? // WP 6.0
+		settings.__experimentalBlockPatternCategories; // WP 5.9
+
+	const { restBlockPatterns, restBlockPatternCategories } = useSelect(
+		( select ) => ( {
+			restBlockPatterns: select( coreStore ).getBlockPatterns(),
+			restBlockPatternCategories:
+				select( coreStore ).getBlockPatternCategories(),
+		} ),
+		[]
+	);
+
+	const blockPatterns = useMemo(
+		() =>
+			[
+				...( settingsBlockPatterns || [] ),
+				...( restBlockPatterns || [] ),
+			]
+				.filter(
+					( x, index, arr ) =>
+						index === arr.findIndex( ( y ) => x.name === y.name )
+				)
+				.filter( ( { postTypes } ) => {
+					return (
+						! postTypes ||
+						( Array.isArray( postTypes ) &&
+							postTypes.includes( postType ) )
+					);
+				} ),
+		[ settingsBlockPatterns, restBlockPatterns, postType ]
+	);
+
+	const blockPatternCategories = useMemo(
+		() =>
+			[
+				...( settingsBlockPatternCategories || [] ),
+				...( restBlockPatternCategories || [] ),
+			].filter(
+				( x, index, arr ) =>
+					index === arr.findIndex( ( y ) => x.name === y.name )
+			),
+		[ settingsBlockPatternCategories, restBlockPatternCategories ]
+	);
 
 	const { undo } = useDispatch( editorStore );
 
@@ -91,8 +135,7 @@ function useBlockEditorSettings( settings, hasTemplate ) {
 		() => ( {
 			...pick( settings, [
 				'__experimentalBlockDirectory',
-				'__experimentalBlockPatternCategories',
-				'__experimentalBlockPatterns',
+				'__experimentalDiscussionSettings',
 				'__experimentalFeatures',
 				'__experimentalPreferredStyleVariations',
 				'__experimentalSetIsInserterOpened',
@@ -100,19 +143,24 @@ function useBlockEditorSettings( settings, hasTemplate ) {
 				'alignWide',
 				'allowedBlockTypes',
 				'bodyPlaceholder',
+				'canLockBlocks',
 				'codeEditingEnabled',
 				'colors',
 				'disableCustomColors',
 				'disableCustomFontSizes',
+				'disableCustomSpacingSizes',
 				'disableCustomGradients',
+				'disableLayoutStyles',
 				'enableCustomLineHeight',
 				'enableCustomSpacing',
 				'enableCustomUnits',
 				'focusMode',
 				'fontSizes',
 				'gradients',
+				'generateAnchors',
 				'hasFixedToolbar',
-				'hasReducedUI',
+				'isDistractionFree',
+				'hasInlineToolbar',
 				'imageDefaultSize',
 				'imageDimensions',
 				'imageEditing',
@@ -127,9 +175,12 @@ function useBlockEditorSettings( settings, hasTemplate ) {
 				'titlePlaceholder',
 				'supportsLayout',
 				'widgetTypesToHideFromLegacyWidgetBlock',
+				'__unstableResolvedAssets',
 			] ),
 			mediaUpload: hasUploadPermissions ? mediaUpload : undefined,
 			__experimentalReusableBlocks: reusableBlocks,
+			__experimentalBlockPatterns: blockPatterns,
+			__experimentalBlockPatternCategories: blockPatternCategories,
 			__experimentalFetchLinkSuggestions: ( search, searchOptions ) =>
 				fetchLinkSuggestions( search, searchOptions, settings ),
 			__experimentalFetchRichUrlData: fetchUrlData,
@@ -138,15 +189,20 @@ function useBlockEditorSettings( settings, hasTemplate ) {
 			outlineMode: hasTemplate,
 			__experimentalCreatePageEntity: createPageEntity,
 			__experimentalUserCanCreatePages: userCanCreatePages,
+			pageOnFront,
+			__experimentalPreferPatternsOnRoot: hasTemplate,
 		} ),
 		[
 			settings,
 			hasUploadPermissions,
 			reusableBlocks,
+			blockPatterns,
+			blockPatternCategories,
 			canUseUnfilteredHTML,
 			undo,
 			hasTemplate,
 			userCanCreatePages,
+			pageOnFront,
 		]
 	);
 }

@@ -35,6 +35,7 @@ export const Gallery = ( props ) => {
 	const {
 		mediaPlaceholder,
 		attributes,
+		images,
 		isNarrow,
 		onBlur,
 		insertBlocksAfter,
@@ -48,11 +49,8 @@ export const Gallery = ( props ) => {
 		}
 	}, [ sizes ] );
 
-	const {
-		images,
-		align,
-		columns = defaultColumnsNumber( images.length ),
-	} = attributes;
+	const { align, columns = defaultColumnsNumber( images.length ) } =
+		attributes;
 
 	const displayedColumns = Math.min(
 		columns,
@@ -113,7 +111,7 @@ export const Gallery = ( props ) => {
 						  )
 				}
 				onFocus={ focusGalleryCaption }
-				onBlur={ onBlur } // always assign onBlur as props
+				onBlur={ onBlur } // Always assign onBlur as props.
 				insertBlocksAfter={ insertBlocksAfter }
 			/>
 		</View>

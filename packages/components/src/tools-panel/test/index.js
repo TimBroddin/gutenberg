@@ -11,6 +11,7 @@ import { createSlotFill, Provider as SlotFillProvider } from '../../slot-fill';
 
 const { Fill: ToolsPanelItems, Slot } = createSlotFill( 'ToolsPanelSlot' );
 const resetAll = jest.fn();
+const noop = () => undefined;
 
 // Default props for the tools panel.
 const defaultProps = {
@@ -86,6 +87,23 @@ const GroupedItems = ( {
 	);
 };
 
+// This context object is used to help simulate different scenarios in which
+// `ToolsPanelItem` registration or deregistration requires testing.
+const panelContext = {
+	panelId: '1234',
+	menuItems: {
+		default: {},
+		optional: { [ altControlProps.label ]: true },
+	},
+	hasMenuItems: false,
+	isResetting: false,
+	shouldRenderPlaceholderItems: false,
+	registerPanelItem: jest.fn(),
+	deregisterPanelItem: jest.fn(),
+	flagItemCustomization: noop,
+	areAllOptionalControlsHidden: true,
+};
+
 // Renders a tools panel including panel items that have been grouped within
 // a custom component.
 const renderGroupedItemsInPanel = () => {
@@ -143,7 +161,7 @@ const renderPanel = () => {
  */
 const getMenuButton = () => {
 	return screen.getByRole( 'button', {
-		name: /view([\w\s]+)options/i,
+		name: /Panel([\w\s]+)header([\w\s]+)options/i,
 	} );
 };
 
@@ -160,7 +178,6 @@ const openDropdownMenu = () => {
 
 // Opens dropdown then selects the menu item by label before simulating a click.
 const selectMenuItem = async ( label ) => {
-	openDropdownMenu();
 	const menuItem = await screen.findByText( label );
 	fireEvent.click( menuItem );
 };
@@ -271,18 +288,30 @@ describe( 'ToolsPanel', () => {
 
 		it( 'should render panel item when corresponding menu item is selected', async () => {
 			renderPanel();
+			await openDropdownMenu();
 			await selectMenuItem( altControlProps.label );
 			const control = await screen.findByText( 'Alt control' );
 
 			expect( control ).toBeInTheDocument();
+
+			// Test the aria live announcement.
+			const announcement = screen.getByText( 'Alt is now visible' );
+			expect( announcement ).toHaveAttribute( 'aria-live', 'assertive' );
 		} );
 
 		it( 'should prevent optional panel item rendering when toggled off via menu item', async () => {
 			renderPanel();
+			await openDropdownMenu();
 			await selectMenuItem( controlProps.label );
 			const control = screen.queryByText( 'Example control' );
 
 			expect( control ).not.toBeInTheDocument();
+
+			// Test the aria live announcement.
+			const announcement = screen.getByText(
+				'Example hidden and reset to default'
+			);
+			expect( announcement ).toHaveAttribute( 'aria-live', 'assertive' );
 		} );
 
 		it( 'should continue to render shown by default item after it is toggled off via menu item', async () => {
@@ -301,10 +330,15 @@ describe( 'ToolsPanel', () => {
 
 			expect( control ).toBeInTheDocument();
 
+			await openDropdownMenu();
 			await selectMenuItem( controlProps.label );
 			const resetControl = screen.getByText( 'Default control' );
 
 			expect( resetControl ).toBeInTheDocument();
+
+			// Test the aria live announcement.
+			const announcement = screen.getByText( 'Example reset to default' );
+			expect( announcement ).toHaveAttribute( 'aria-live', 'assertive' );
 		} );
 
 		it( 'should render appropriate menu groups', async () => {
@@ -499,6 +533,10 @@ describe( 'ToolsPanel', () => {
 	} );
 
 	describe( 'registration of panel items', () => {
+		beforeEach( () => {
+			jest.clearAllMocks();
+		} );
+
 		it( 'should register and deregister items when panelId changes', () => {
 			// This test simulates switching block selection, which causes the
 			// `ToolsPanel` to rerender with a new panelId, necessitating the
@@ -509,23 +547,7 @@ describe( 'ToolsPanel', () => {
 			// themselves, while those for the old panelId deregister.
 			//
 			// See: https://github.com/WordPress/gutenberg/pull/36588
-
-			const noop = () => undefined;
-			const context = {
-				panelId: '1234',
-				menuItems: {
-					default: {},
-					optional: { [ altControlProps.label ]: true },
-				},
-				hasMenuItems: false,
-				isResetting: false,
-				shouldRenderPlaceholderItems: false,
-				registerPanelItem: jest.fn(),
-				deregisterPanelItem: jest.fn(),
-				flagItemCustomization: noop,
-				areAllOptionalControlsHidden: true,
-			};
-
+			const context = { ...panelContext };
 			const TestPanel = () => (
 				<ToolsPanelContext.Provider value={ context }>
 					<ToolsPanelItem { ...altControlProps } panelId="1234">
@@ -581,6 +603,67 @@ describe( 'ToolsPanel', () => {
 			// deregisterPanelItem has still only been called once.
 			expect( context.deregisterPanelItem ).toHaveBeenCalledTimes( 1 );
 		} );
+
+		it( 'should register items when ToolsPanel panelId is null', () => {
+			// This test simulates when a panel spans multiple block selections.
+			// Multi-selection means a panel can't have a single id to match
+			// against the item's. Instead the panel gets an id of `null` and
+			// individual items should still render themselves in this case.
+			//
+			// See: https://github.com/WordPress/gutenberg/pull/37216
+			const context = { ...panelContext, panelId: null };
+			const TestPanel = () => (
+				<ToolsPanelContext.Provider value={ context }>
+					<ToolsPanelItem { ...altControlProps } panelId="1234">
+						<div>Item</div>
+					</ToolsPanelItem>
+				</ToolsPanelContext.Provider>
+			);
+
+			// On the initial render of the panel, the ToolsPanelItem should
+			// be registered.
+			const { rerender, unmount } = render( <TestPanel /> );
+
+			expect( context.registerPanelItem ).toHaveBeenCalledWith(
+				expect.objectContaining( {
+					label: altControlProps.label,
+					panelId: '1234',
+				} )
+			);
+			expect( context.deregisterPanelItem ).not.toHaveBeenCalled();
+
+			// Simulate a further block selection being added to the
+			// multi-selection. The panelId will remain `null` in this case.
+			rerender( <TestPanel /> );
+			expect( context.registerPanelItem ).toHaveBeenCalledTimes( 1 );
+			expect( context.deregisterPanelItem ).not.toHaveBeenCalled();
+
+			// Simulate a change in panel back to single block selection for
+			// which the item matches panelId.
+			context.panelId = '1234';
+			rerender( <TestPanel /> );
+			expect( context.registerPanelItem ).toHaveBeenCalledTimes( 1 );
+			expect( context.deregisterPanelItem ).not.toHaveBeenCalled();
+
+			// Simulate another multi-selection where the panelId is `null`.
+			// Item should re-register itself after it deregistered as the
+			// multi-selection occurred.
+			context.panelId = null;
+			rerender( <TestPanel /> );
+			expect( context.registerPanelItem ).toHaveBeenCalledTimes( 2 );
+			expect( context.deregisterPanelItem ).toHaveBeenCalledTimes( 1 );
+
+			// Simulate a change in panel e.g. back to a single block selection
+			// Where the item's panelId is not a match.
+			context.panelId = '4321';
+			rerender( <TestPanel /> );
+
+			// As the item no longer matches the panelId it should not have
+			// registered again but instead deregistered.
+			unmount();
+			expect( context.registerPanelItem ).toHaveBeenCalledTimes( 2 );
+			expect( context.deregisterPanelItem ).toHaveBeenCalledTimes( 2 );
+		} );
 	} );
 
 	describe( 'callbacks on menu item selection', () => {
@@ -590,6 +673,8 @@ describe( 'ToolsPanel', () => {
 
 		it( 'should call onDeselect callback when menu item is toggled off', async () => {
 			renderPanel();
+
+			await openDropdownMenu();
 			await selectMenuItem( controlProps.label );
 
 			expect( controlProps.onSelect ).not.toHaveBeenCalled();
@@ -598,6 +683,8 @@ describe( 'ToolsPanel', () => {
 
 		it( 'should call onSelect callback when menu item is toggled on', async () => {
 			renderPanel();
+
+			await openDropdownMenu();
 			await selectMenuItem( altControlProps.label );
 
 			expect( altControlProps.onSelect ).toHaveBeenCalledTimes( 1 );
@@ -606,6 +693,8 @@ describe( 'ToolsPanel', () => {
 
 		it( 'should call resetAll callback when its menu item is selected', async () => {
 			renderPanel();
+
+			await openDropdownMenu();
 			await selectMenuItem( 'Reset all' );
 
 			expect( resetAll ).toHaveBeenCalledTimes( 1 );
@@ -621,6 +710,7 @@ describe( 'ToolsPanel', () => {
 		it( 'should call onDeselect after previous reset all', async () => {
 			renderPanel();
 
+			await openDropdownMenu();
 			await selectMenuItem( 'Reset all' ); // Initial control is displayed by default.
 			await selectMenuItem( controlProps.label ); // Re-display control.
 
@@ -648,9 +738,8 @@ describe( 'ToolsPanel', () => {
 			openDropdownMenu();
 
 			const defaultItem = screen.getByText( 'Nested Control 1' );
-			const defaultMenuItem = screen.getByRole( 'menuitemcheckbox', {
+			const defaultMenuItem = screen.getByRole( 'menuitem', {
 				name: 'Reset Nested Control 1',
-				checked: true,
 			} );
 
 			const altItem = screen.getByText( 'Nested Control 2' );
@@ -687,9 +776,8 @@ describe( 'ToolsPanel', () => {
 			openDropdownMenu();
 
 			const defaultItem = screen.getByText( 'Nested Control 1' );
-			const defaultMenuItem = screen.getByRole( 'menuitemcheckbox', {
+			const defaultMenuItem = screen.getByRole( 'menuitem', {
 				name: 'Reset Nested Control 1',
-				checked: true,
 			} );
 
 			const altItem = screen.getByText( 'Nested Control 2' );
@@ -740,6 +828,7 @@ describe( 'ToolsPanel', () => {
 			expect( secondItem ).toBeInTheDocument();
 
 			// Toggle on the first item.
+			await openDropdownMenu();
 			await selectMenuItem( altControlProps.label );
 
 			// The order of items should be as per their original source order.
@@ -775,8 +864,6 @@ describe( 'ToolsPanel', () => {
 			// This test simulates this issue by rendering an item within a
 			// contrived `ToolsPanelContext` to reflect the changes the panel
 			// item needs to protect against.
-
-			const noop = () => undefined;
 			const context = {
 				panelId: '1234',
 				menuItems: {
@@ -821,9 +908,73 @@ describe( 'ToolsPanel', () => {
 
 			expect( altControlProps.onDeselect ).not.toHaveBeenCalled();
 		} );
+
+		it( 'should not contain orphaned menu items when panelId changes', async () => {
+			// As fills and the panel can update independently this aims to
+			// test that no orphaned items appear registered in the panel menu.
+			//
+			// See: https://github.com/WordPress/gutenberg/pull/34085
+			const TestSlotFillPanel = ( { panelId } ) => (
+				<SlotFillProvider>
+					<ToolsPanelItems>
+						<ToolsPanelItem { ...altControlProps } panelId="1234">
+							<div>Item 1</div>
+						</ToolsPanelItem>
+					</ToolsPanelItems>
+					<ToolsPanelItems>
+						<ToolsPanelItem { ...controlProps } panelId="9999">
+							<div>Item 2</div>
+						</ToolsPanelItem>
+					</ToolsPanelItems>
+					<ToolsPanel { ...defaultProps } panelId={ panelId }>
+						<Slot />
+					</ToolsPanel>
+				</SlotFillProvider>
+			);
+
+			const { rerender } = render( <TestSlotFillPanel panelId="1234" /> );
+			await openDropdownMenu();
+
+			// Only the item matching the panelId should have been registered
+			// and appear in the panel menu.
+			let altMenuItem = screen.getByRole( 'menuitemcheckbox', {
+				name: 'Show Alt',
+			} );
+			let exampleMenuItem = screen.queryByRole( 'menuitemcheckbox', {
+				name: 'Hide and reset Example',
+			} );
+
+			expect( altMenuItem ).toBeInTheDocument();
+			expect( exampleMenuItem ).not.toBeInTheDocument();
+
+			// Re-render the panel with different panelID simulating a block
+			// selection change.
+			rerender( <TestSlotFillPanel panelId="9999" /> );
+
+			altMenuItem = screen.queryByRole( 'menuitemcheckbox', {
+				name: 'Show Alt',
+			} );
+			exampleMenuItem = screen.getByRole( 'menuitemcheckbox', {
+				name: 'Hide and reset Example',
+			} );
+
+			expect( altMenuItem ).not.toBeInTheDocument();
+			expect( exampleMenuItem ).toBeInTheDocument();
+		} );
 	} );
 
 	describe( 'panel header icon toggle', () => {
+		const defaultControls = {
+			attributes: { value: false },
+			hasValue: jest.fn().mockImplementation( () => {
+				return !! defaultControls.attributes.value;
+			} ),
+			label: 'Default',
+			onDeselect: jest.fn(),
+			onSelect: jest.fn(),
+			isShownByDefault: true,
+		};
+
 		const optionalControls = {
 			attributes: { value: false },
 			hasValue: jest.fn().mockImplementation( () => {
@@ -835,7 +986,31 @@ describe( 'ToolsPanel', () => {
 			isShownByDefault: false,
 		};
 
-		it( 'should render appropriate icons for the dropdown menu', async () => {
+		it( 'should render appropriate labels and descriptions for the dropdown menu where there are default controls', async () => {
+			render(
+				<ToolsPanel { ...defaultProps }>
+					<ToolsPanelItem { ...defaultControls }>
+						<div>Default control</div>
+					</ToolsPanelItem>
+					<ToolsPanelItem { ...optionalControls }>
+						<div>Optional control</div>
+					</ToolsPanelItem>
+				</ToolsPanel>
+			);
+
+			const optionsDisplayedIcon = screen.getByRole( 'button', {
+				name: 'Panel header options',
+			} );
+
+			expect( optionsDisplayedIcon ).toBeInTheDocument();
+
+			// The dropdown toggle doesn't have a description when an option is displayed.
+			// In this case the default control is displayed.
+			expect( optionsDisplayedIcon ).not.toHaveAccessibleDescription();
+		} );
+
+		it( 'should render appropriate labels and descriptions for the dropdown menu where there are no default controls', async () => {
+			// All options are inactive.
 			render(
 				<ToolsPanel { ...defaultProps }>
 					<ToolsPanelItem { ...optionalControls }>
@@ -844,25 +1019,100 @@ describe( 'ToolsPanel', () => {
 				</ToolsPanel>
 			);
 
-			// There are unactivated, optional menu items in the Tools Panel dropdown.
 			const optionsHiddenIcon = screen.getByRole( 'button', {
-				name: 'View and add options',
+				name: 'Panel header options',
 			} );
 
+			// The dropdown toggle has a description indicating that all options are hidden.
 			expect( optionsHiddenIcon ).toBeInTheDocument();
+			expect( optionsHiddenIcon ).toHaveAccessibleDescription(
+				'All options are currently hidden'
+			);
 
+			// Activate one of the options.
+			await openDropdownMenu();
 			await selectMenuItem( optionalControls.label );
 
-			// There are now NO unactivated, optional menu items in the Tools Panel dropdown.
-			expect(
-				screen.queryByRole( 'button', { name: 'View and add options' } )
-			).not.toBeInTheDocument();
-
 			const optionsDisplayedIcon = screen.getByRole( 'button', {
-				name: 'View options',
+				name: 'Panel header options',
 			} );
 
-			expect( optionsDisplayedIcon ).toBeInTheDocument();
+			// The dropdown toggle no longer has a description.
+			expect( optionsDisplayedIcon ).not.toHaveAccessibleDescription();
+		} );
+	} );
+
+	describe( 'reset all button', () => {
+		it( "should disable the reset all button when there's nothing to reset", async () => {
+			await renderPanel();
+			await openDropdownMenu();
+
+			const resetAllItem = await screen.findByRole( 'menuitem', {
+				disabled: false,
+			} );
+			expect( resetAllItem ).toBeInTheDocument();
+
+			await selectMenuItem( 'Reset all' );
+
+			// Test the aria live announcement.
+			const announcement = screen.getByText( 'All options reset' );
+			expect( announcement ).toHaveAttribute( 'aria-live', 'assertive' );
+
+			const disabledResetAllItem = await screen.findByRole( 'menuitem', {
+				disabled: true,
+			} );
+			expect( disabledResetAllItem ).toBeInTheDocument();
+		} );
+	} );
+
+	describe( 'first and last panel items', () => {
+		it( 'should apply first/last classes to appropriate items', () => {
+			render(
+				<SlotFillProvider>
+					<ToolsPanelItems>
+						<ToolsPanelItem { ...altControlProps }>
+							<div>Item 1</div>
+						</ToolsPanelItem>
+						<ToolsPanelItem { ...controlProps }>
+							<div>Item 2</div>
+						</ToolsPanelItem>
+					</ToolsPanelItems>
+					<ToolsPanelItems>
+						<ToolsPanelItem
+							{ ...altControlProps }
+							label="Item 3"
+							isShownByDefault={ true }
+						>
+							<div>Item 3</div>
+						</ToolsPanelItem>
+					</ToolsPanelItems>
+					<ToolsPanelItems>
+						<ToolsPanelItem { ...altControlProps } label="Item 4">
+							<div>Item 4</div>
+						</ToolsPanelItem>
+					</ToolsPanelItems>
+					<ToolsPanel
+						{ ...defaultProps }
+						hasInnerWrapper={ true }
+						shouldRenderPlaceholderItems={ true }
+						__experimentalFirstVisibleItemClass="first"
+						__experimentalLastVisibleItemClass="last"
+					>
+						<Slot />
+					</ToolsPanel>
+				</SlotFillProvider>
+			);
+
+			const item2 = screen.getByText( 'Item 2' );
+			const item3 = screen.getByText( 'Item 3' );
+
+			expect( screen.queryByText( 'Item 1' ) ).not.toBeInTheDocument();
+			expect( item2 ).toBeInTheDocument();
+			expect( item3 ).toBeInTheDocument();
+			expect( screen.queryByText( 'Item 4' ) ).not.toBeInTheDocument();
+
+			expect( item2.parentElement ).toHaveClass( 'first' );
+			expect( item3.parentElement ).toHaveClass( 'last' );
 		} );
 	} );
 } );
